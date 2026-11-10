@@ -22,7 +22,7 @@
 
 ## Artigo 2 — Fonte da verdade
 
-2.1. A fonte da verdade de negócio é o **DVP vigente** (hoje, versão **2.9**), cujo original está em
+2.1. A fonte da verdade de negócio é o **DVP vigente** (hoje, versão **3.1**), cujo original está em
 `../../ADS_EduardoCamargo_AgilizaDelivery/agilizadelivery/docs/DVP_Agiliza_Delivery_latest_version.md`.
 Uma **cópia espelho** fica em `../docs/DVP_Agiliza_Delivery_latest_version.md`, só para quando a leitura cruzada de pastas falhar (AGENT.md, seção 0). Essa cópia pode estar desatualizada; se for usada, isso vai no relatório. Os documentos em `AgilizAI_requisitos/docs/old_versions/` e `.../integracao_outros_programas/` são históricos e **não valem**.
 

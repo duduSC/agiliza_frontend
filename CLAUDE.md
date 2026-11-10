@@ -11,4 +11,4 @@ Resumo operacional:
 - Sem tarefa pendente e sem o Eduardo pedindo nada agora, não altere nada: informe que está aguardando delegação.
 - `../ADS_EduardoCamargo_AgilizaDelivery/` e `../AgilizAI_requisitos/` são **somente leitura**, mesmo a pedido direto do Eduardo (Constituição, Artigo 3.2). Para o backend, use `sugestoes-backend/`.
 - Nunca apague ou sobrescreva `agent/`, `docs/`, `tarefas/`, `relatorios/`, `sugestoes-backend/` ou `.claude/` ao rodar ferramentas de scaffold (Constituição, Artigo 3.5).
-- A fonte da verdade de negócio é o DVP v2.9: `../ADS_EduardoCamargo_AgilizaDelivery/agilizadelivery/docs/DVP_Agiliza_Delivery_latest_version.md` (cópia em `docs/` se a leitura cruzada falhar).
+- A fonte da verdade de negócio é o DVP v3.1: `../ADS_EduardoCamargo_AgilizaDelivery/agilizadelivery/docs/DVP_Agiliza_Delivery_latest_version.md` (cópia em `docs/` se a leitura cruzada falhar).
