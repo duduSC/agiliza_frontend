@@ -1,6 +1,6 @@
 # T001 — Setup do projeto e fundações compartilhadas
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F0
 **Depende de:** —
 **Referências no DVP:** 1.5.1, 1.5.2, 1.4.4, 2.2 (Entregas 1 e 4)
