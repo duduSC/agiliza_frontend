@@ -6,7 +6,12 @@
  * Padrão: tupla `as const` (usada pelos schemas Zod) + tipo derivado + labels pt-BR.
  */
 
-export const PERFIS_USUARIO = ['ADMIN_GERAL', 'ADMIN_RESTAURANTE', 'OPERADOR', 'ENTREGADOR'] as const
+export const PERFIS_USUARIO = [
+  'ADMIN_GERAL',
+  'ADMIN_RESTAURANTE',
+  'OPERADOR',
+  'ENTREGADOR',
+] as const
 export type PerfilUsuario = (typeof PERFIS_USUARIO)[number]
 export const LABEL_PERFIL_USUARIO: Record<PerfilUsuario, string> = {
   ADMIN_GERAL: 'Administrador geral',
@@ -81,7 +86,11 @@ export const LABEL_STATUS_ESTABELECIMENTO: Record<StatusEstabelecimento, string>
 }
 
 /** Só três motivos (Constituição, Artigo 5.4; DVP v2.9). */
-export const MOTIVOS_REVISAO = ['SEM_COORDENADA', 'SEM_DISTANCIA', 'CONTESTACAO_ENTREGADOR'] as const
+export const MOTIVOS_REVISAO = [
+  'SEM_COORDENADA',
+  'SEM_DISTANCIA',
+  'CONTESTACAO_ENTREGADOR',
+] as const
 export type MotivoRevisao = (typeof MOTIVOS_REVISAO)[number]
 export const LABEL_MOTIVO_REVISAO: Record<MotivoRevisao, string> = {
   SEM_COORDENADA: 'Endereço sem coordenada',
