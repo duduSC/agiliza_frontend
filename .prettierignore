@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+package-lock.json
+public/mockServiceWorker.js
+
+# Governança — nunca reformatar automaticamente
+CLAUDE.md
+agent/
+docs/
+tarefas/
+relatorios/
+sugestoes-backend/
+.claude/
