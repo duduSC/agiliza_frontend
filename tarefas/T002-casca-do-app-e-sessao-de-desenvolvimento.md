@@ -1,6 +1,6 @@
 # T002 — Casca do app, guardas por perfil e sessão de desenvolvimento
 
-**Status:** PENDENTE
+**Status:** EM_ANDAMENTO
 **Fase:** F1
 **Depende de:** T001 (CONCLUIDA)
 **Referências no DVP:** UC07 (perfis e E4), seção 1.4.2.7/1.4.3.7; telas do `AGENT.md` seções 7 e 8
