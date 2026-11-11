@@ -24,7 +24,7 @@
 
 O Agiliza Delivery é uma plataforma **multi-tenant** de logística para restaurantes com frota própria de entregadores ("motoboys"). Ela substitui a planilha de acerto e a digitação manual de pedidos.
 
-- **Backend:** Java 21 + Spring Boot 3, PostgreSQL 16, API REST, autenticação JWT e WebSocket STOMP. É mantido por outro agente (Claude CLI), em sessão separada — ver seção 3.4 sobre como se comunicar com ele.
+- **Backend:** Java 21 + Spring Boot 4, PostgreSQL 16, API REST, autenticação JWT e WebSocket STOMP. É mantido por outro agente (Claude CLI), em sessão separada — ver seção 3.4 sobre como se comunicar com ele.
 - **App do entregador:** Flutter, Android. Fica fora deste repositório.
 - **Backoffice Web (você):** SPA React com o mapa de despacho, o monitoramento da frota, o acerto financeiro e o cadastro da loja e dos restaurantes.
 
@@ -201,7 +201,7 @@ Cada `features/<x>/` contém `api/` (hooks do TanStack Query), `componentes/`, `
 | StatusEstabelecimento | `ATIVO`, `INATIVO` |
 | MotivoRevisao | `SEM_COORDENADA`, `SEM_DISTANCIA`, `CONTESTACAO_ENTREGADOR` |
 | FormaPagamento | `DINHEIRO`, `CREDITO`, `DEBITO`, `PIX`, `VALE` |
-| Provedor | `IFOOD`, `SIMULADOR` |
+| Provedor | texto (`VARCHAR(20)`), não enum; valores hoje aceitos: `IFOOD`, `SIMULADOR` |
 | StatusFalhaIntegracao | `PENDENTE`, `REPROCESSADA`, `DESCARTADA` |
 | EtapaFalhaIntegracao | `AUTENTICACAO`, `CONSULTA`, `CONFIRMACAO`, `GEOCODIFICACAO`, `PERSISTENCIA` |
 | SituacaoAcerto | `A_ACERTAR`, `CONSOLIDADA`, `EM_REVISAO` (confirmado em 10/11/2026, ver 6.3 `LinhaExtratoResponse`) |
@@ -219,7 +219,7 @@ Cada `features/<x>/` contém `api/` (hooks do TanStack Query), `componentes/`, `
 
 - **CoordenadaDto**: `latitude`, `longitude` (BigDecimal → `number`)
 - **EntregaResponse**: `id`, `estabelecimentoId`, `pedidoExternoId?`, `loteId?`, `faixaPrecoId?`, `reciboId?`, `nomeCliente`, `telefoneCliente?`, `enderecoCompleto`, `bairro?`, `cep?`, `complemento?`, `pontoReferencia?`, `coordenada?`, `valorPedido?`, `formaPagamento?`, `pagoOnline`, `trocoPara?`, `observacoes?`, `distanciaKm?`, `valorRepasse?`, `status`, `motivoFalha?`, `pendenteRevisao`, `motivoRevisao?`, `prontoParaDespachoEm?`, `despachadaEm?`, `finalizadaEm?`, `ordemRota?` (**fora do escopo — ver 6.4**), `criadoEm`, `atualizadoEm?`
-- **LoteEntregaResponse**: `id`, `estabelecimentoId`, `motoboyId`, `usuarioDespachanteId`, `status`, `qtdEntregas`, `valorTotalRepasse?`, `distanciaRotaKm?` (**fora do escopo — ver 6.4**), `despachadoEm?`, `concluidoEm?`, `criadoEm`, `atualizadoEm?`
+- **LoteEntregaResponse**: `id`, `estabelecimentoId`, `motoboyId`, `usuarioDespachanteId`, `status`, `qtdEntregas`, `valorTotalRepasse?`, `despachadoEm?`, `concluidoEm?`, `criadoEm`, `atualizadoEm?`
 - **MotoboyResponse**: `id`, `usuarioId`, `nome`, `telefone`, `placaVeiculo?`, `statusCadastro`, `statusDisponibilidade`, `ultimaPosicao?`, `ultimaPosicaoEm?`, `criadoEm`, `atualizadoEm?` (o CPF **não** vem)
 - **ReciboResponse**: `id`, `estabelecimentoId`, `caixaId`, `motoboyId`, `usuarioGeradorId`, `dataReferencia`, `periodoInicio`, `periodoFim`, `qtdEntregas`, `valorTotal`, `status`, `pagoEm?`, `criadoEm`, `atualizadoEm?`
 - **CaixaResponse**: `id`, `estabelecimentoId`, `dataReferencia`, `abertoEm`, `fechadoEm?`, `usuarioFechamentoId?`, `status`, `qtdRecibos?`, `valorTotal?`, `reabertoEm?`, `usuarioReaberturaId?`, `motivoReabertura?`, `criadoEm`, `atualizadoEm?`
@@ -269,7 +269,7 @@ type ApiErrorResponse = {
 };
 ```
 
-Valores de `codigo`: `ERRO_INTERNO_SERVIDOR`, `DADOS_INVALIDOS`, `CORPO_REQUISICAO_INVALIDO`, `PARAMETRO_INVALIDO`, `RECURSO_NAO_ENCONTRADO`, `ESTABELECIMENTO_NAO_ENCONTRADO`, `USUARIO_NAO_ENCONTRADO`, `MOTOBOY_NAO_ENCONTRADO`, `ENTREGA_NAO_ENCONTRADA`, `LOTE_NAO_ENCONTRADO`, `CAIXA_NAO_ENCONTRADO`, `RECIBO_NAO_ENCONTRADO`, `FAIXA_PRECO_NAO_ENCONTRADA`, `REGRA_NEGOCIO_VIOLADA`, `TRANSICAO_ESTADO_INVALIDA`, `CAIXA_FECHADO`, `LIMITE_LOTE_EXCEDIDO`, `MOTOBOY_INDISPONIVEL`, `ENTREGA_INAPTA_LOTE`, `ENTREGA_INAPTA_RECIBO`, `RECIBO_INALTERAVEL`, `FAIXA_PRECO_INVALIDA`, `AJUSTE_VALOR_NAO_PERMITIDO`, `DADO_DUPLICADO`, `CNPJ_JA_CADASTRADO`, `CPF_JA_CADASTRADO`, `EMAIL_JA_CADASTRADO`, `CAIXA_JA_ABERTO`, `PEDIDO_JA_IMPORTADO`, `ACESSO_NEGADO`, `ESTABELECIMENTO_INATIVO`, `USUARIO_BLOQUEADO`, `VIOLACAO_MULTITENANT`, `INTEGRACAO_EXTERNA_ERRO`.
+Valores de `codigo`: `ERRO_INTERNO_SERVIDOR`, `CREDENCIAIS_INVALIDAS` (401 do login, UC07 E1), `DADOS_INVALIDOS`, `CORPO_REQUISICAO_INVALIDO`, `PARAMETRO_INVALIDO`, `RECURSO_NAO_ENCONTRADO`, `ESTABELECIMENTO_NAO_ENCONTRADO`, `USUARIO_NAO_ENCONTRADO`, `MOTOBOY_NAO_ENCONTRADO`, `ENTREGA_NAO_ENCONTRADA`, `LOTE_NAO_ENCONTRADO`, `CAIXA_NAO_ENCONTRADO`, `RECIBO_NAO_ENCONTRADO`, `FAIXA_PRECO_NAO_ENCONTRADA`, `REGRA_NEGOCIO_VIOLADA`, `TRANSICAO_ESTADO_INVALIDA`, `CAIXA_FECHADO`, `LIMITE_LOTE_EXCEDIDO`, `MOTOBOY_INDISPONIVEL`, `ENTREGA_INAPTA_LOTE`, `ENTREGA_INAPTA_RECIBO`, `RECIBO_INALTERAVEL`, `FAIXA_PRECO_INVALIDA`, `AJUSTE_VALOR_NAO_PERMITIDO`, `DADO_DUPLICADO`, `CNPJ_JA_CADASTRADO`, `CPF_JA_CADASTRADO`, `EMAIL_JA_CADASTRADO`, `CAIXA_JA_ABERTO`, `PEDIDO_JA_IMPORTADO`, `ACESSO_NEGADO`, `ESTABELECIMENTO_INATIVO`, `USUARIO_BLOQUEADO`, `VIOLACAO_MULTITENANT`, `INTEGRACAO_EXTERNA_ERRO`.
 
 Mapeie cada código para uma mensagem pt-BR em `shared/api/erros.ts`. Código desconhecido cai na `message` do servidor.
 
@@ -320,11 +320,11 @@ Mapeie cada código para uma mensagem pt-BR em `shared/api/erros.ts`. Código de
 | Perfil | Telas |
 | --- | --- |
 | `ADMIN_GERAL` | `/restaurantes` (lista, cadastro, ativar/inativar) |
-| `ADMIN_RESTAURANTE` | `/loja/entregadores`, `/loja/faixas-preco`, `/loja/parametros`, `/loja/integracao`, e "Reabrir caixa" em `/caixa` |
+| `ADMIN_RESTAURANTE` | `/loja/entregadores`, `/loja/faixas-preco`, `/loja/parametros`, `/loja/integracao`, **e também todas as telas do `OPERADOR`** (`/despacho`, `/monitoramento`, `/acerto`, `/caixa`), com "Reabrir caixa" em `/caixa` (só ele) |
 | `OPERADOR` | `/despacho`, `/monitoramento`, `/acerto`, `/caixa` |
 | `ENTREGADOR` | **nenhuma**: o login é recusado no backoffice com uma mensagem própria (UC07, E4) |
 
-O `ADMIN_RESTAURANTE` **não** acessa as telas do operador (`/despacho`, `/monitoramento`, `/acerto`, `/caixa` fora de "Reabrir caixa") até alguém decidir o contrário — essa pergunta está em aberto (seção 12, item 2) e o padrão, enquanto isso, é o mais restritivo (Constituição 1.3). Não libere por conta própria; registre a pergunta no relatório se a tarefa tocar nisso.
+O `ADMIN_RESTAURANTE` **acessa também as telas do operador**, por decisão do Eduardo em 10/11/2026 (D004; o DVP é silente neste ponto). "Reabrir caixa" continua exclusivo dele. O `OPERADOR` não acessa as telas `/loja/*`. Se um ponto de permissão novo surgir sem regra clara, o padrão continua sendo o mais restritivo (Constituição 1.3).
 
 Depois do login, redirecione para a primeira tela do perfil. A rota sem permissão vai para `/acesso-negado`.
 
@@ -332,7 +332,8 @@ Depois do login, redirecione para a primeira tela do perfil. A rota sem permiss�
 
 ## 8. Telas e regras de cada uma
 
-### 8.1 Login (UC07, HU13)
+### 8.1 Login (UC07, HU13) — fica para a F7
+Até lá, as telas usam a sessão provisória de desenvolvimento (seção 10, F1). Não construir esta tela antes de uma tarefa da F7.
 - E-mail e senha. Erro sempre genérico: "E-mail ou senha inválidos".
 - Para `ESTABELECIMENTO_INATIVO`, mostre "O acesso desta loja está suspenso". Para `USUARIO_BLOQUEADO`, mostre "Usuário sem acesso".
 - O token fica em memória (Zustand). O logout limpa a sessão e o `queryClient.clear()`.
@@ -411,19 +412,21 @@ O prazo final é **17/11/2026**. O Orquestrador quebra cada fase em tarefas `T0x
 | Fase | Conteúdo | DVP |
 | --- | --- | --- |
 | F0 | Setup: Vite, TS strict, Tailwind, shadcn, ESLint, Vitest, MSW, estrutura de pastas, `shared/api` e `shared/dominio` | 2.2 – Entrega 1/4 |
-| F1 | Login, sessão, layout, guardas por perfil | UC07 |
+| F1 | Casca do app: layout, navegação por perfil, guardas de rota e **sessão provisória de desenvolvimento** (seletor de perfil e estabelecimento, só em dev/mocks). **Sem tela de login** | UC07 (guardas) |
 | F2 | Lista de entregas pendentes e de revisão, entrega avulsa | Entrega 4, UC01 |
 | F3 | Mapa de despacho, seleção, despacho, devolução, WebSocket | Entrega 6, UC01 |
 | F4 | Monitoramento da frota | Entrega 6/7, UC04 |
 | F5 | Acerto, recibo, caixa | Entrega 8, UC03 |
 | F6 | Loja (entregadores, faixas, parâmetros, integração) e Restaurantes | UC05, UC06 |
-| F7 | E2E dos fluxos principais e ajustes contra a API real | Entrega 9 |
+| F7 | **Login real e sessão real** (UC07, HU13, depende da T004 do backend), E2E dos fluxos principais e ajustes contra a API real | UC07, Entrega 9 |
+
+> Ordem decidida pelo Eduardo em 10/11/2026 (D003): a tela de login fica para o fim; primeiro o corpo da aplicação. Até a F7, a sessão vem de um provedor de desenvolvimento que **não existe no build de produção**.
 
 ---
 
 ## 11. Definição de pronto
 
-Scripts esperados no `package.json`: `dev`, `build`, `typecheck` (`tsc --noEmit`), `lint`, `test` (`vitest run`), `test:e2e`.
+Scripts esperados no `package.json`: `dev`, `build`, `typecheck` (`tsc -b`, pois o projeto usa project references e `--noEmit` não checa nada), `lint`, `test` (`vitest run`), `test:e2e`.
 
 Uma tarefa está **CONCLUIDA** quando:
 1. o escopo da tarefa foi entregue e nada além dele;
@@ -439,7 +442,7 @@ Uma tarefa está **CONCLUIDA** quando:
 ## 12. Pontos em aberto (não decida, registre)
 
 1. **Caminhos reais da API e tópicos STOMP:** aguardam os controllers do backend. Registrar via `../sugestoes-backend/` quando um endpoint concreto fizer falta numa tarefa.
-2. **O `ADMIN_RESTAURANTE` acessa as telas do operador?** O DVP não diz. Padrão atual (seção 7): não acessa.
+2. ~~O `ADMIN_RESTAURANTE` acessa as telas do operador?~~ Respondido pelo Eduardo em 10/11/2026 (D004): sim, acessa (ver seção 7).
 3. ~~A resposta do login traz o usuário junto com o token, ou é preciso um `GET /api/auth/me`?~~ Parcialmente respondido em 10/11/2026: existe `UsuarioAutenticadoResponse` no backend, desenhado exatamente para isso (ver 6.3). Ainda não há controller para confirmar se vem embutido na resposta do login ou por uma rota separada.
 4. CORS e a URL base da API em desenvolvimento (proposta: `VITE_API_URL=http://localhost:8080`).
 5. ~~Existe endpoint de **extrato do acerto** com total calculado pelo servidor?~~ Respondido em 10/11/2026: existe `ExtratoAcertoResponse` no backend, com `totalDevido`/`totalConsolidado`/`totalEmRevisao` já calculados (ver 6.3). Falta só o controller para expor isso — continue tratando `GET /api/acertos...` como PROVISÓRIO até lá.
