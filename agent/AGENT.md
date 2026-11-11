@@ -257,7 +257,7 @@ Nos schemas Zod, os campos marcados com `?` são `.nullable().optional()` — ac
 | SalvarConfiguracaoIntegracaoRequest | `provedor`, `merchantId` |
 | AlterarDisponibilidadeMotoboyRequest | `status` (`StatusDisponibilidadeMotoboy`) — existe no backend; confirmar se o Backoffice usa isso ou se é exclusivo do app do entregador antes de expor uma ação para isso em 8.6 |
 
-**Existem no backend, mas são FORA DO ESCOPO (Constituição 4.2) — não usar sem tarefa explícita:** `SugerirRotaRequest`, `RotaLoteResponse`, `SugestaoRotaResponse`, `ParadaRotaResponse`. São da otimização de rota, que não está no MVP. Se você os encontrar ao ler a pasta de DTOs (seção 0, passo 5), ignore-os.
+**Existem no backend, mas são FORA DO ESCOPO (Constituição 4.2) — não usar sem tarefa explícita:** `RotaLoteResponse`, `ParadaRotaResponse` e o campo `ordemRota` (a ordem em que o operador escolhe as entregas no despacho; `SugerirRotaRequest` e `SugestaoRotaResponse` não existem no backend). Isso é da rota, que não está no MVP além da ordem manual. Se você os encontrar ao ler a pasta de DTOs (seção 0, passo 5), ignore-os.
 
 ### 6.5 Formato de erro (todas as respostas de erro)
 
