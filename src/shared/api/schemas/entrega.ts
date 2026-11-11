@@ -42,3 +42,37 @@ export const entregaResponseSchema = z.object({
   atualizadoEm: opcional(localDateTime),
 })
 export type EntregaResponse = z.infer<typeof entregaResponseSchema>
+
+export const listaEntregasResponseSchema = z.array(entregaResponseSchema)
+
+/**
+ * `dto/request/CriarEntregaAvulsaRequest.java` (conferido em 11/11/2026). Campos opcionais
+ * vão como `null` quando não informados; `coordenada` é `CoordenadaDto`.
+ */
+export type CriarEntregaAvulsaRequest = {
+  nomeCliente: string
+  telefoneCliente: string | null
+  enderecoCompleto: string
+  bairro: string | null
+  cep: string | null
+  complemento: string | null
+  pontoReferencia: string | null
+  coordenada: { latitude: number; longitude: number } | null
+  valorPedido: number | null
+  formaPagamento: (typeof FORMAS_PAGAMENTO)[number] | null
+  pagoOnline: boolean
+  trocoPara: number | null
+  observacoes: string | null
+}
+
+/**
+ * PROVISÓRIO: o backend não tem request DTO para o cancelamento — o serviço
+ * `EntregaService.cancelar(..., motivo)` recebe só o motivo. Corpo proposto: `{ motivo }`.
+ */
+export type CancelarEntregaRequest = { motivo: string }
+
+/**
+ * PROVISÓRIO: o backend não tem request DTO para o ajuste de pino — o serviço
+ * `EntregaService.ajustarCoordenada(..., latitude, longitude, ...)`. Corpo proposto: `CoordenadaDto`.
+ */
+export type AjustarCoordenadaRequest = { latitude: number; longitude: number }
