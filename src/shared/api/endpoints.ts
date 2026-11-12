@@ -13,11 +13,13 @@ export const ENDPOINTS = {
     login: '/api/auth/login', // PROVISÓRIO
   },
   entregas: {
-    listar: '/api/entregas', // PROVISÓRIO — filtros ?status= e ?pendenteRevisao=true
-    criarAvulsa: '/api/entregas', // PROVISÓRIO
-    marcarPronto: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/pronto`, // PROVISÓRIO
-    ajustarCoordenada: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/coordenada`, // PROVISÓRIO
-    cancelar: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/cancelar`, // PROVISÓRIO
+    // PROVISÓRIO — filtros ?status=AGUARDANDO_DESPACHO (pendentes) e ?pendenteRevisao=true
+    // (fila de revisão; ainda sem método de serviço no backend, S004 do backend).
+    listar: '/api/entregas',
+    criarAvulsa: '/api/entregas', // PROVISÓRIO — POST, corpo CriarEntregaAvulsaRequest
+    marcarPronto: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/pronto`, // PROVISÓRIO — POST sem corpo
+    ajustarCoordenada: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/coordenada`, // PROVISÓRIO — PATCH, corpo CoordenadaDto
+    cancelar: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/cancelar`, // PROVISÓRIO — POST, corpo { motivo }
     ajustarRepasse: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/ajustes`, // PROVISÓRIO
   },
   lotes: {

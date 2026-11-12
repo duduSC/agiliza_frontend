@@ -3,6 +3,18 @@ import { MemoryRouter } from 'react-router-dom'
 import { calcularSessaoDevHabilitada } from './sessaoDevHabilitada'
 import { TelaSemSessao } from './paginas/TelaSemSessao'
 
+/**
+ * Pre-carrega o modulo do SeletorSessaoDev antes dos testes.
+ * React.lazy(() => import(...)) cria uma promessa que pode levar tempo
+ * indeterminado para resolver em jsdom quando outros testes estao rodando
+ * em paralelo. Ao importar o modulo aqui, o cache do Vitest ja tem o
+ * modulo resolvido quando o lazy() dispara o import(), eliminando a
+ * condicao de corrida que fazia o Suspense fallback ficar preso.
+ */
+beforeAll(async () => {
+  await import('./dev/SeletorSessaoDev')
+})
+
 describe('sessão de desenvolvimento (PROVISÓRIO)', () => {
   it('só fica habilitada com DEV ou VITE_USE_MOCKS=true, e nunca em produção', () => {
     expect(calcularSessaoDevHabilitada({ PROD: false, DEV: true })).toBe(true)
@@ -36,7 +48,7 @@ describe('sessão de desenvolvimento (PROVISÓRIO)', () => {
         <TelaSemSessao sessaoDevHabilitada />
       </MemoryRouter>,
     )
-    expect(await screen.findByRole('form', { name: /sessão de desenvolvimento/i })).toBeInTheDocument()
+    expect(await screen.findByRole('form', { name: /sessão de desenvolvimento/i }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByLabelText('Perfil')).toBeInTheDocument()
   })
 })
