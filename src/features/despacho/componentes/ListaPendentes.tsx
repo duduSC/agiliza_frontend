@@ -1,6 +1,7 @@
 /**
- * Entregas AGUARDANDO_DESPACHO sem revisão pendente (HU01; AGENT.md 8.2). Sem mapa nesta
- * fase (F3). Repasse `null` aparece como "—" (Constituição, Artigo 5.1).
+ * Entregas AGUARDANDO_DESPACHO sem revisao pendente (HU01; AGENT.md 8.2).
+ * T003: lista basica. T004: selecao multipla (clique na linha alterna selecao).
+ * Repasse `null` aparece como "--" (Constituicao, Artigo 5.1).
  */
 import { toast } from 'sonner'
 import type { EntregaResponse } from '@/shared/api'
@@ -23,6 +24,7 @@ import {
   podeCancelar,
   podeMarcarPronto,
 } from '../regras'
+import { useSelecaoStore } from '../selecaoStore'
 import { mensagemDoErro, useAgora } from '../util'
 import { BotaoCancelarEntrega } from './DialogoCancelarEntrega'
 
@@ -66,14 +68,17 @@ function TabelaPendentes({ entregas, agora }: { entregas: EntregaResponse[]; ago
     <Table aria-label="Entregas aguardando despacho">
       <TableHeader>
         <TableRow>
+          <TableHead className="w-10">
+            <span className="sr-only">Selecao</span>
+          </TableHead>
           <TableHead>Cliente</TableHead>
           <TableHead>Bairro</TableHead>
-          <TableHead>Distância</TableHead>
+          <TableHead>Distancia</TableHead>
           <TableHead>Repasse</TableHead>
           <TableHead>Pagamento</TableHead>
           <TableHead>Espera</TableHead>
           <TableHead>
-            <span className="sr-only">Ações</span>
+            <span className="sr-only">Acoes</span>
           </TableHead>
         </TableRow>
       </TableHeader>
@@ -88,6 +93,9 @@ function TabelaPendentes({ entregas, agora }: { entregas: EntregaResponse[]; ago
 
 function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Date }) {
   const marcar = useMarcarPronto()
+  const estaSelecionada = useSelecaoStore((s) => s.selecionadas.has(entrega.id))
+  const alternarSelecao = useSelecaoStore((s) => s.alternarSelecao)
+  const maxPedidosPorLote = useSelecaoStore((s) => s.maxPedidosPorLote)
 
   const aoMarcarPronto = () => {
     if (marcar.isPending) return
@@ -97,14 +105,35 @@ function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Da
     })
   }
 
+  const aoAlternar = () => {
+    const sucesso = alternarSelecao(entrega.id)
+    if (!sucesso) {
+      toast.error(
+        `Limite de ${maxPedidosPorLote} entregas por lote atingido. Remova uma entrega antes de adicionar outra.`,
+      )
+    }
+  }
+
   return (
-    <TableRow data-testid={`pendente-${entrega.id}`}>
+    <TableRow
+      data-testid={`pendente-${entrega.id}`}
+      className={estaSelecionada ? 'bg-primary/5' : undefined}
+    >
+      <TableCell>
+        <input
+          type="checkbox"
+          className="size-4"
+          checked={estaSelecionada}
+          onChange={aoAlternar}
+          aria-label={`Selecionar entrega de ${entrega.nomeCliente}`}
+        />
+      </TableCell>
       <TableCell className="font-medium">{entrega.nomeCliente}</TableCell>
-      <TableCell>{entrega.bairro ?? '—'}</TableCell>
+      <TableCell>{entrega.bairro ?? '--'}</TableCell>
       <TableCell>{formatarKm(entrega.distanciaKm)}</TableCell>
       <TableCell>
         <span
-          title={entrega.valorRepasse == null ? 'Repasse ainda não calculado' : 'Repasse provisório'}
+          title={entrega.valorRepasse == null ? 'Repasse ainda nao calculado' : 'Repasse provisorio'}
         >
           {formatarMoeda(entrega.valorRepasse)}
         </span>
@@ -124,7 +153,7 @@ function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Da
               disabled={marcar.isPending}
               aria-label={`Marcar pronto: entrega de ${entrega.nomeCliente}`}
             >
-              {marcar.isPending ? 'Marcando…' : 'Marcar pronto'}
+              {marcar.isPending ? 'Marcando...' : 'Marcar pronto'}
             </Button>
           )}
           {podeCancelar(entrega) && <BotaoCancelarEntrega entrega={entrega} />}
