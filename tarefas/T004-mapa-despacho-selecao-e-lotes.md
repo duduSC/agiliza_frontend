@@ -1,6 +1,6 @@
 # T004 — Mapa de despacho, seleção múltipla e lotes
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F3
 **Depende de:** T003
 **Referências no DVP:** UC01 (fluxo principal, A1–A5, E1–E2), HU01, HU02, HU03, 1.4.4 (máquina de estados), 1.5.4 (LOTE_ENTREGA, MOTOBOY), RNF06 (tempo real)
