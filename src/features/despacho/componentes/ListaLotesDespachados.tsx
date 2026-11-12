@@ -1,0 +1,107 @@
+/**
+ * Lotes DESPACHADO ainda nao saidos (T004, UC01 A4). Oferecem "Devolver lote" apenas
+ * quando o status e DESPACHADO. Sem atualizacao otimista (Constituicao 5.8).
+ */
+import { toast } from 'sonner'
+import type { LoteEntregaResponse } from '@/shared/api/schemas'
+import { LABEL_STATUS_LOTE } from '@/shared/dominio'
+import { formatarMoeda } from '@/shared/formatacao'
+import { Badge } from '@/shared/ui/badge'
+import { Button } from '@/shared/ui/button'
+import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useDevolverLote, useLotesDespachados } from '../api/hooks'
+import { mensagemDoErro } from '../util'
+
+export function ListaLotesDespachados() {
+  const consulta = useLotesDespachados()
+
+  let estado: EstadoTela
+  if (consulta.isPending) estado = { tipo: 'carregando' }
+  else if (consulta.isError)
+    estado = {
+      tipo: 'erro',
+      mensagem: mensagemDoErro(consulta.error),
+      aoTentarNovamente: () => void consulta.refetch(),
+    }
+  else if (consulta.data.length === 0)
+    estado = {
+      tipo: 'vazio',
+      titulo: 'Nenhum lote despachado',
+      descricao: 'Lotes despachados aparecem aqui enquanto nao sairam para rota.',
+    }
+  else
+    estado = {
+      tipo: 'sucesso',
+      conteudo: (
+        <ul aria-label="Lotes despachados" className="flex flex-col gap-3">
+          {consulta.data.map((lote) => (
+            <ItemLote key={lote.id} lote={lote} />
+          ))}
+        </ul>
+      ),
+    }
+
+  return (
+    <section aria-labelledby="titulo-lotes" className="flex flex-col gap-3">
+      <h2 id="titulo-lotes" className="text-lg font-semibold">
+        Lotes despachados
+        {consulta.data && consulta.data.length > 0 && (
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            ({consulta.data.length})
+          </span>
+        )}
+      </h2>
+      <ConteudoPorEstado estado={estado} />
+    </section>
+  )
+}
+
+function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
+  const devolver = useDevolverLote()
+  const podeDevolver = lote.status === 'DESPACHADO'
+
+  const aoDevolver = async () => {
+    if (devolver.isPending) return
+    try {
+      await devolver.mutateAsync(lote.id)
+      toast.success(`Lote com ${lote.qtdEntregas} entrega(s) devolvido.`)
+    } catch (erro) {
+      toast.error(mensagemDoErro(erro))
+    }
+  }
+
+  return (
+    <li
+      data-testid={`lote-${lote.id}`}
+      className="flex flex-col gap-2 rounded-lg border p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-medium">
+            {lote.qtdEntregas} entrega(s)
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Repasse total: {formatarMoeda(lote.valorTotalRepasse)}
+          </p>
+        </div>
+        <Badge variant="outline">
+          {LABEL_STATUS_LOTE[lote.status]}
+        </Badge>
+      </div>
+      {podeDevolver && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={aoDevolver}
+            disabled={devolver.isPending}
+            aria-label={`Devolver lote com ${lote.qtdEntregas} entregas`}
+          >
+            {devolver.isPending ? 'Devolvendo...' : 'Devolver lote'}
+          </Button>
+        </div>
+      )}
+    </li>
+  )
+}

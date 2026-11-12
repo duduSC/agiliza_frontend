@@ -1,15 +1,16 @@
 /**
- * Hooks TanStack Query do despacho (T003).
+ * Hooks TanStack Query do despacho (T003 + T004).
  *
- * - Chaves escopadas pelo `estabelecimentoId` da SESSÃO (nunca de entrada do usuário —
- *   Constituição, Artigo 6.2).
- * - Polling de 15 s como fallback enquanto não há tempo real (AGENT.md 6.8; WebSocket é F3).
- * - Nenhuma escrita é otimista: a tela só muda depois da resposta do servidor e da
- *   invalidação das listas (Constituição, Artigos 5.5 e 5.8).
+ * - Chaves escopadas pelo `estabelecimentoId` da SESSAO (nunca de entrada do usuario --
+ *   Constituicao, Artigo 6.2).
+ * - Polling de 15 s como fallback enquanto STOMP desconectado (AGENT.md 6.8).
+ * - Nenhuma escrita e otimista: a tela so muda depois da resposta do servidor e da
+ *   invalidacao das listas (Constituicao, Artigos 5.5 e 5.8).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSessaoStore } from '@/features/auth'
 import type { AjustarCoordenadaRequest, CriarEntregaAvulsaRequest } from '@/shared/api'
+import { obterEstadoConexao } from '@/shared/realtime'
 import {
   ajustarCoordenada,
   cancelarEntrega,
@@ -18,14 +19,39 @@ import {
   listarPendentesDeDespacho,
   marcarPronto,
 } from './entregasApi'
+import { contarFalhasPendentes } from './falhasApi'
+import { despacharLote, devolverLote, listarLotesDespachados, type DespacharLoteRequest } from './lotesApi'
+import { listarEntregadoresDisponiveis } from './motoboysApi'
 
 export const INTERVALO_POLLING_MS = 15_000
+
+/** Polling ativo apenas quando STOMP desconectado. */
+function intervaloPolling(): number | false {
+  return obterEstadoConexao() === 'conectado' ? false : INTERVALO_POLLING_MS
+}
 
 export const chavesEntregas = {
   todas: (estabelecimentoId: string | null) => ['entregas', estabelecimentoId] as const,
   pendentes: (estabelecimentoId: string | null) =>
     ['entregas', estabelecimentoId, 'pendentes'] as const,
   revisao: (estabelecimentoId: string | null) => ['entregas', estabelecimentoId, 'revisao'] as const,
+}
+
+export const chavesLotes = {
+  todas: (estabelecimentoId: string | null) => ['lotes', estabelecimentoId] as const,
+  despachados: (estabelecimentoId: string | null) =>
+    ['lotes', estabelecimentoId, 'despachados'] as const,
+}
+
+export const chavesMotoboys = {
+  todas: (estabelecimentoId: string | null) => ['motoboys', estabelecimentoId] as const,
+  disponiveis: (estabelecimentoId: string | null) =>
+    ['motoboys', estabelecimentoId, 'disponiveis'] as const,
+}
+
+export const chavesFalhas = {
+  pendentes: (estabelecimentoId: string | null) =>
+    ['falhas', estabelecimentoId, 'pendentes'] as const,
 }
 
 function useEstabelecimentoDaSessao(): string | null {
@@ -38,7 +64,7 @@ export function useEntregasPendentes() {
     queryKey: chavesEntregas.pendentes(estabelecimentoId),
     queryFn: ({ signal }) => listarPendentesDeDespacho(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: INTERVALO_POLLING_MS,
+    refetchInterval: intervaloPolling,
   })
 }
 
@@ -48,18 +74,52 @@ export function useEntregasEmRevisao() {
     queryKey: chavesEntregas.revisao(estabelecimentoId),
     queryFn: ({ signal }) => listarEmRevisao(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: INTERVALO_POLLING_MS,
+    refetchInterval: intervaloPolling,
   })
 }
 
-function useInvalidarEntregas() {
+export function useLotesDespachados() {
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useQuery({
+    queryKey: chavesLotes.despachados(estabelecimentoId),
+    queryFn: ({ signal }) => listarLotesDespachados(signal),
+    enabled: estabelecimentoId !== null,
+    refetchInterval: intervaloPolling,
+  })
+}
+
+export function useEntregadoresDisponiveis() {
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useQuery({
+    queryKey: chavesMotoboys.disponiveis(estabelecimentoId),
+    queryFn: ({ signal }) => listarEntregadoresDisponiveis(signal),
+    enabled: estabelecimentoId !== null,
+    refetchInterval: intervaloPolling,
+  })
+}
+
+export function useFalhasPendentes() {
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useQuery({
+    queryKey: chavesFalhas.pendentes(estabelecimentoId),
+    queryFn: ({ signal }) => contarFalhasPendentes(signal),
+    enabled: estabelecimentoId !== null,
+    refetchInterval: 60_000, // Falhas: polling menos frequente
+  })
+}
+
+function useInvalidarDespacho() {
   const queryClient = useQueryClient()
   const estabelecimentoId = useEstabelecimentoDaSessao()
-  return () => queryClient.invalidateQueries({ queryKey: chavesEntregas.todas(estabelecimentoId) })
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: chavesEntregas.todas(estabelecimentoId) })
+    void queryClient.invalidateQueries({ queryKey: chavesLotes.todas(estabelecimentoId) })
+    void queryClient.invalidateQueries({ queryKey: chavesMotoboys.todas(estabelecimentoId) })
+  }
 }
 
 export function useCriarEntregaAvulsa() {
-  const invalidar = useInvalidarEntregas()
+  const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (corpo: CriarEntregaAvulsaRequest) => criarEntregaAvulsa(corpo),
     onSuccess: () => invalidar(),
@@ -67,7 +127,7 @@ export function useCriarEntregaAvulsa() {
 }
 
 export function useMarcarPronto() {
-  const invalidar = useInvalidarEntregas()
+  const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (id: string) => marcarPronto(id),
     onSuccess: () => invalidar(),
@@ -75,7 +135,7 @@ export function useMarcarPronto() {
 }
 
 export function useCancelarEntrega() {
-  const invalidar = useInvalidarEntregas()
+  const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: ({ id, motivo }: { id: string; motivo: string }) => cancelarEntrega(id, motivo),
     onSuccess: () => invalidar(),
@@ -83,10 +143,26 @@ export function useCancelarEntrega() {
 }
 
 export function useAjustarCoordenada() {
-  const invalidar = useInvalidarEntregas()
+  const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: ({ id, coordenada }: { id: string; coordenada: AjustarCoordenadaRequest }) =>
       ajustarCoordenada(id, coordenada),
+    onSuccess: () => invalidar(),
+  })
+}
+
+export function useDespacharLote() {
+  const invalidar = useInvalidarDespacho()
+  return useMutation({
+    mutationFn: (corpo: DespacharLoteRequest) => despacharLote(corpo),
+    onSuccess: () => invalidar(),
+  })
+}
+
+export function useDevolverLote() {
+  const invalidar = useInvalidarDespacho()
+  return useMutation({
+    mutationFn: (id: string) => devolverLote(id),
     onSuccess: () => invalidar(),
   })
 }
