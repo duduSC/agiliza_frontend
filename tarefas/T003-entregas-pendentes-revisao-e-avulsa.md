@@ -1,6 +1,6 @@
 # T003 — Entregas pendentes, fila de revisão e entrega avulsa
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F2
 **Depende de:** T002 (CONCLUIDA)
 **Referências no DVP:** UC01 (fluxo principal, A1, A2, A5), HU01, HU02, HU03, 1.4.4 (máquina de estados), 1.5.4 (ENTREGA)
