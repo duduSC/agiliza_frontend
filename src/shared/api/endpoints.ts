@@ -5,6 +5,7 @@
  * Endpoints de auth confirmados pelo backend (S006, T004 do backend).
  * Endpoints de lotes confirmados pelo backend (S008, T006 do backend).
  * Endpoints de motoboys confirmados pelo backend (S008, T006 do backend).
+ * Endpoints de acerto/recibos/caixa confirmados pelo backend (S009, T007 do backend).
  * Os demais continuam PROVISORIOS ate o backend publicar os controllers.
  */
 
@@ -24,7 +25,8 @@ export const ENDPOINTS = {
     ajustarCoordenada: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/coordenada`, // Confirmado (S007) — PATCH, corpo { latitude, longitude }
     cancelar: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/cancelar`, // Confirmado (S007) — POST, corpo { motivo }
     resolverRevisao: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/revisao/resolver`, // Confirmado (S007) — POST, corpo { valorRepasse?, motivo }
-    ajustarRepasse: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/ajustes`, // PROVISORIO
+    ajustarRepasse: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/ajustes`, // Confirmado (S009) — POST ajuste / GET historico
+    historicoAjustes: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/ajustes`, // Confirmado (S009) — GET
   },
   lotes: {
     listar: '/api/lotes', // Confirmado (S008) — GET, params: ?status (default DESPACHADO)
@@ -42,18 +44,21 @@ export const ENDPOINTS = {
     desbloquear: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}/desbloquear`, // Confirmado (S008) — POST
   },
   acertos: {
-    extrato: '/api/acertos', // PROVISORIO — ?motoboyId=&inicio=&fim=
+    extrato: '/api/acertos', // Confirmado (S009) — GET ?motoboyId=&inicio=&fim=
   },
   recibos: {
-    gerar: '/api/recibos', // PROVISORIO
-    pagar: (id: Id) => `/api/recibos/${encodeURIComponent(id)}/pagar`, // PROVISORIO
-    cancelar: (id: Id) => `/api/recibos/${encodeURIComponent(id)}/cancelar`, // PROVISORIO
+    listar: '/api/recibos', // Confirmado (S009) — GET ?motoboyId=&caixaId=
+    gerar: '/api/recibos', // Confirmado (S009) — POST 201
+    detalhe: (id: Id) => `/api/recibos/${encodeURIComponent(id)}`, // Confirmado (S009) — GET
+    pagar: (id: Id) => `/api/recibos/${encodeURIComponent(id)}/pagar`, // Confirmado (S009) — POST
+    cancelar: (id: Id) => `/api/recibos/${encodeURIComponent(id)}/cancelar`, // Confirmado (S009) — POST
   },
   caixas: {
-    atual: '/api/caixas/atual', // PROVISORIO
-    abrir: '/api/caixas', // PROVISORIO
-    fechar: (id: Id) => `/api/caixas/${encodeURIComponent(id)}/fechar`, // PROVISORIO
-    reabrir: (id: Id) => `/api/caixas/${encodeURIComponent(id)}/reabrir`, // PROVISORIO
+    atual: '/api/caixas/atual', // Confirmado (S009) — GET
+    listar: '/api/caixas', // Confirmado (S009) — GET ?dataInicio=&dataFim=
+    abrir: '/api/caixas', // Confirmado (S009) — POST 201
+    fechar: (id: Id) => `/api/caixas/${encodeURIComponent(id)}/fechar`, // Confirmado (S009) — POST
+    reabrir: (id: Id) => `/api/caixas/${encodeURIComponent(id)}/reabrir`, // Confirmado (S009) — POST (so ADMIN_RESTAURANTE)
   },
   faixasPreco: {
     listar: '/api/faixas-preco', // PROVISORIO
