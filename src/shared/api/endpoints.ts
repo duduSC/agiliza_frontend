@@ -3,6 +3,8 @@
  *
  * Endpoints de entregas confirmados pelo backend (S007, T005 do backend).
  * Endpoints de auth confirmados pelo backend (S006, T004 do backend).
+ * Endpoints de lotes confirmados pelo backend (S008, T006 do backend).
+ * Endpoints de motoboys confirmados pelo backend (S008, T006 do backend).
  * Os demais continuam PROVISORIOS ate o backend publicar os controllers.
  */
 
@@ -25,15 +27,19 @@ export const ENDPOINTS = {
     ajustarRepasse: (id: Id) => `/api/entregas/${encodeURIComponent(id)}/ajustes`, // PROVISORIO
   },
   lotes: {
-    listar: '/api/lotes', // PROVISORIO — GET, ?status=DESPACHADO
-    despachar: '/api/lotes', // PROVISORIO — POST, corpo DespacharLoteRequest
-    devolver: (id: Id) => `/api/lotes/${encodeURIComponent(id)}/devolver`, // PROVISORIO
+    listar: '/api/lotes', // Confirmado (S008) — GET, params: ?status (default DESPACHADO)
+    despachar: '/api/lotes', // Confirmado (S008) — POST 201, corpo DespacharLoteRequest
+    detalhe: (id: Id) => `/api/lotes/${encodeURIComponent(id)}`, // Confirmado (S008) — GET
+    devolver: (id: Id) => `/api/lotes/${encodeURIComponent(id)}/devolver`, // Confirmado (S008) — POST
+    rota: (id: Id) => `/api/lotes/${encodeURIComponent(id)}/rota`, // Confirmado (S008) — GET (fora do escopo MVP)
   },
   motoboys: {
-    listar: '/api/motoboys', // PROVISORIO
-    criar: '/api/motoboys', // PROVISORIO
-    bloquear: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}/bloquear`, // PROVISORIO
-    desbloquear: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}/desbloquear`, // PROVISORIO
+    listar: '/api/motoboys', // Confirmado (S008) — GET, params: ?statusCadastro, ?statusDisponibilidade
+    detalhe: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}`, // Confirmado (S008) — GET
+    criar: '/api/motoboys', // Confirmado (S008) — POST 201
+    editar: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}`, // Confirmado (S008) — PUT
+    bloquear: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}/bloquear`, // Confirmado (S008) — POST
+    desbloquear: (id: Id) => `/api/motoboys/${encodeURIComponent(id)}/desbloquear`, // Confirmado (S008) — POST
   },
   acertos: {
     extrato: '/api/acertos', // PROVISORIO — ?motoboyId=&inicio=&fim=

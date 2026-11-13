@@ -35,7 +35,7 @@ function wsUrl(): string {
   return 'ws://localhost:8080/ws'
 }
 
-type EstadoConexao = 'conectando' | 'conectado' | 'desconectado'
+export type EstadoConexao = 'conectando' | 'conectado' | 'desconectado'
 
 let clienteGlobal: Client | null = null
 let estadoAtual: EstadoConexao = 'desconectado'
