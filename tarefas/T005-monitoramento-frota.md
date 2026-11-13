@@ -1,6 +1,6 @@
 # T005 — Monitoramento da frota em tempo real
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F4
 **Depende de:** T004
 **Referências no DVP:** UC04 (1.4.2.4, HU08, A1), RNF06 (tempo real)
