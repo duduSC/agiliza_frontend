@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { cleanup } from '@testing-library/react'
 import { vi } from 'vitest'
+import { redefinirAcerto } from './msw/dadosAcerto'
 import { redefinirEntregas } from './msw/dadosEntregas'
 import { redefinirLotes } from './msw/dadosLotes'
 import { redefinirMotoboys } from './msw/dadosMotoboys'
@@ -65,6 +66,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
   cleanup()
   server.resetHandlers()
+  redefinirAcerto()
   redefinirEntregas()
   redefinirLotes()
   redefinirMotoboys()

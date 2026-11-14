@@ -1,3 +1,4 @@
+export * from './acerto'
 export * from './comuns'
 export * from './coordenada'
 export * from './entrega'
