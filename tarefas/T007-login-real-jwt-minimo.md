@@ -1,6 +1,6 @@
 # T007 — Login real e sessão JWT (F7 mínimo)
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F7
 **Depende de:** T006
 **Referências no DVP:** UC07 (1.4.2.7, HU13, E1, E4), RNF05
