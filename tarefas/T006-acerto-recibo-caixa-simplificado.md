@@ -1,6 +1,6 @@
 # T006 — Acerto financeiro, recibo e caixa (F5 simplificado)
 
-**Status:** PARCIAL
+**Status:** CONCLUIDA
 **Fase:** F5
 **Depende de:** T005
 **Referências no DVP:** UC03 (1.4.2.3, HU06, HU07), 1.4.4 (máquina de estados RECIBO e CAIXA), RNF05
