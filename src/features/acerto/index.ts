@@ -1,2 +1,3 @@
-// API pública do módulo `acerto` (AGENT.md, seção 5).
+// API publica do modulo `acerto` (AGENT.md, secao 5).
 export { AcertoPagina } from './paginas/AcertoPagina'
+export { chavesAcerto, chavesRecibos } from './api/hooks'

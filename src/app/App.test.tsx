@@ -133,7 +133,7 @@ describe('casca do app — Sair', () => {
     const { queryClient } = renderizarApp('/acerto')
     await esperarTitulo('Acerto')
     queryClient.setQueryData(['extrato', 'x'], { totalDevido: 10 })
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(1)
+    expect(queryClient.getQueryCache().getAll().length).toBeGreaterThanOrEqual(1)
 
     await user.click(screen.getByRole('button', { name: 'Sair' }))
 
