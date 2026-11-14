@@ -14,8 +14,8 @@ const erro = (status: number, codigo: string) =>
 
 beforeEach(() => redefinirSessao())
 
-describe('cliente HTTP ligado à sessão', () => {
-  it('envia o token da sessão em memória', async () => {
+describe('cliente HTTP ligado a sessao', () => {
+  it('envia o token da sessao em memoria', async () => {
     let autorizacao: string | null = null
     server.use(
       http.get('*/api/teste', ({ request }) => {
@@ -30,16 +30,20 @@ describe('cliente HTTP ligado à sessão', () => {
     expect(autorizacao).toBe('Bearer jwt-teste')
   })
 
-  it('401 encerra a sessão e mostra "Sem sessão"', async () => {
-    server.use(http.get('*/api/teste', () => erro(401, 'ACESSO_NEGADO')))
+  it('401 encerra a sessao e redireciona para /login', async () => {
+    // Mock refresh para falhar tambem (token invalido)
+    server.use(
+      http.get('*/api/teste', () => erro(401, 'ACESSO_NEGADO')),
+      http.post('*/api/auth/refresh', () => erro(401, 'CREDENCIAIS_INVALIDAS')),
+    )
     entrarComo('OPERADOR', 'jwt-expirado')
-    renderizarApp('/despacho')
+    const { local } = renderizarApp('/despacho')
     await screen.findByRole('heading', { level: 1, name: 'Despacho' })
 
     await expect(requisitar({ caminho: '/api/teste' })).rejects.toMatchObject({ status: 401 })
 
     expect(useSessaoStore.getState().usuario).toBeNull()
-    expect(await screen.findByRole('heading', { level: 1, name: 'Sem sessão' })).toBeInTheDocument()
+    await waitFor(() => expect(local.pathname).toBe('/login'))
   })
 
   it('403 leva para /acesso-negado', async () => {

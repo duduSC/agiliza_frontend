@@ -58,12 +58,13 @@ function iniciarSessaoOperador() {
       perfil: 'OPERADOR',
     },
     token: 'token-teste',
+    refreshToken: 'refresh-token-teste',
     estabelecimentoId: ESTABELECIMENTO_TESTE,
   })
 }
 
 function limparSessao() {
-  useSessaoStore.setState({ usuario: null, token: null, estabelecimentoId: null })
+  useSessaoStore.setState({ usuario: null, token: null, refreshToken: null, estabelecimentoId: null })
 }
 
 function criarQueryClient() {

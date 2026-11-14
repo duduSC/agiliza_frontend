@@ -19,12 +19,15 @@ export type ValorQuery = string | number | boolean | null | undefined
 
 type ConfiguracaoCliente = {
   obterToken: () => string | null
+  /** Tenta renovar o token de acesso. Retorna o novo token ou null se falhar. */
+  tentarRefresh: () => Promise<string | null>
   aoNaoAutenticado: (erro: ErroApi) => void
   aoAcessoNegado: (erro: ErroApi) => void
 }
 
 const configuracaoPadrao: ConfiguracaoCliente = {
   obterToken: () => null,
+  tentarRefresh: () => Promise.resolve(null),
   aoNaoAutenticado: () => {},
   aoAcessoNegado: () => {},
 }
@@ -115,7 +118,36 @@ export async function requisitar(
 
   if (!resposta.ok) {
     const erro = parseErroApi(resposta.status, await lerJson(resposta))
-    if (tratarAuth && resposta.status === 401) configuracao.aoNaoAutenticado(erro)
+
+    // Refresh automatico: tenta renovar o token antes de encerrar a sessao (T007).
+    if (tratarAuth && resposta.status === 401) {
+      const novoToken = await configuracao.tentarRefresh()
+      if (novoToken) {
+        // Retry com o novo token
+        const headersRetry = new Headers(headers)
+        headersRetry.set('Authorization', `Bearer ${novoToken}`)
+        try {
+          const retentativa = await fetch(montarUrl(caminho, query), {
+            method: metodo,
+            headers: headersRetry,
+            body: corpo === undefined ? undefined : JSON.stringify(corpo),
+            signal,
+          })
+          if (retentativa.ok) {
+            if (!schema) return undefined
+            const dadosRetry = await lerJson(retentativa)
+            const resultadoRetry = schema.safeParse(dadosRetry)
+            if (!resultadoRetry.success) throw erroRespostaInvalida(retentativa.status, caminho)
+            return resultadoRetry.data
+          }
+          // Retry tambem falhou — cai no fluxo normal de encerrar sessao
+        } catch (erroRetry) {
+          if (ehAbort(erroRetry) || signal?.aborted) throw erroRetry
+          // Retry falhou por rede — segue para aoNaoAutenticado
+        }
+      }
+      configuracao.aoNaoAutenticado(erro)
+    }
     if (tratarAuth && resposta.status === 403) configuracao.aoAcessoNegado(erro)
     throw erro
   }

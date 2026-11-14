@@ -1,14 +1,18 @@
 /**
- * Rotas do Backoffice (AGENT.md, seção 7). Cada tela fica atrás de `ExigirPerfil` com a mesma
+ * Rotas do Backoffice (AGENT.md, secao 7). Cada tela fica atras de `ExigirPerfil` com a mesma
  * chave usada no menu (`shared/dominio/permissoes.ts`), para menu e guarda nunca divergirem.
+ *
+ * T007: /login fora do ExigirSessao; rotas protegidas redirecionam para /login sem sessao.
  */
 import type { ReactNode } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import {
   AcessoNegadoPagina,
   CAMINHO_ACESSO_NEGADO,
+  CAMINHO_LOGIN,
   ExigirPerfil,
   ExigirSessao,
+  LoginPagina,
   RedirecionarParaInicio,
 } from '@/features/auth'
 import { AcertoPagina } from '@/features/acerto'
@@ -44,6 +48,8 @@ export function criarRotas(): RouteObject[] {
   }))
 
   return [
+    // Login fica FORA do ExigirSessao (T007)
+    { path: CAMINHO_LOGIN, element: <LoginPagina /> },
     {
       path: '/',
       element: (
