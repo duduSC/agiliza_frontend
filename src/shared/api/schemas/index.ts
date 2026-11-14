@@ -1,4 +1,5 @@
 export * from './acerto'
+export * from './auth'
 export * from './comuns'
 export * from './coordenada'
 export * from './entrega'

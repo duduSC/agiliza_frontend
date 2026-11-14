@@ -1,15 +1,54 @@
 /**
- * Liga o cliente HTTP único (`shared/api/client.ts`) à sessão em memória e ao roteador
- * (Constituição, Artigo 6.3): 401 → encerra a sessão (a guarda mostra "Sem sessão");
- * 403 → `/acesso-negado`.
+ * Liga o cliente HTTP unico (`shared/api/client.ts`) a sessao em memoria e ao roteador
+ * (Constituicao, Artigo 6.3): 401 -> tenta refresh, se falhar encerra sessao e vai para /login;
+ * 403 -> `/acesso-negado`.
+ *
+ * T007: refresh automatico com mutex para evitar multiplas renovacoes simultaneas.
  */
-import { CAMINHO_ACESSO_NEGADO, obterTokenDaSessao, useSessaoStore } from '@/features/auth'
+import {
+  CAMINHO_ACESSO_NEGADO,
+  CAMINHO_LOGIN,
+  obterRefreshTokenDaSessao,
+  obterTokenDaSessao,
+  useSessaoStore,
+} from '@/features/auth'
+import { renovarToken } from '@/features/auth/api/authApi'
 import { configurarCliente } from '@/shared/api/client'
+
+/** Mutex: so uma tentativa de refresh por vez. */
+let refreshEmAndamento: Promise<string | null> | null = null
+
+async function tentarRefresh(): Promise<string | null> {
+  // Reutiliza a promessa em andamento para evitar multiplas chamadas simultaneas
+  if (refreshEmAndamento) return refreshEmAndamento
+
+  const rt = obterRefreshTokenDaSessao()
+  if (!rt) return null
+
+  refreshEmAndamento = (async () => {
+    try {
+      const resposta = await renovarToken(rt)
+      useSessaoStore.getState().atualizarTokens(resposta.token, resposta.refreshToken)
+      return resposta.token
+    } catch {
+      // Refresh falhou — encerrar sessao
+      return null
+    } finally {
+      refreshEmAndamento = null
+    }
+  })()
+
+  return refreshEmAndamento
+}
 
 export function ligarClienteHttp(navegar: (caminho: string) => void): void {
   configurarCliente({
     obterToken: obterTokenDaSessao,
-    aoNaoAutenticado: () => useSessaoStore.getState().encerrarSessao(),
+    tentarRefresh,
+    aoNaoAutenticado: () => {
+      useSessaoStore.getState().encerrarSessao()
+      navegar(CAMINHO_LOGIN)
+    },
     aoAcessoNegado: () => navegar(CAMINHO_ACESSO_NEGADO),
   })
 }

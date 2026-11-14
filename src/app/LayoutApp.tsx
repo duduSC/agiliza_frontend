@@ -1,12 +1,13 @@
 /**
- * Layout do Backoffice: cabeçalho (usuário, perfil, Sair) + menu com só as telas do perfil.
- * Desktop: menu lateral. Tablet/telas estreitas: menu em faixa horizontal acima do conteúdo.
+ * Layout do Backoffice: cabecalho (usuario, perfil, Sair) + menu com so as telas do perfil.
+ * Desktop: menu lateral. Tablet/telas estreitas: menu em faixa horizontal acima do conteudo.
+ *
+ * T007: removido badge "sessao dev"; logout redireciona para /login.
  */
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
-import { SESSAO_DEV_HABILITADA, useSessaoStore } from '@/features/auth'
+import { CAMINHO_LOGIN, useSessaoStore } from '@/features/auth'
 import { LABEL_PERFIL_USUARIO, telasDoPerfil } from '@/shared/dominio'
-import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -15,13 +16,13 @@ export function LayoutApp() {
   const encerrarSessao = useSessaoStore((s) => s.encerrarSessao)
   const navigate = useNavigate()
 
-  // ExigirSessao garante a sessão; isto só satisfaz o tipo.
+  // ExigirSessao garante a sessao; isto so satisfaz o tipo.
   if (!usuario) return null
   const telas = telasDoPerfil(usuario.perfil)
 
   function sair() {
     encerrarSessao()
-    navigate('/', { replace: true })
+    navigate(CAMINHO_LOGIN, { replace: true })
   }
 
   return (
@@ -29,7 +30,6 @@ export function LayoutApp() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold">Agiliza Delivery</span>
-          {SESSAO_DEV_HABILITADA && <Badge variant="outline">sessão dev</Badge>}
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right text-sm leading-tight">

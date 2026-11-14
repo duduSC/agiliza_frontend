@@ -5,11 +5,15 @@
  * Endpoints de acerto/recibos/caixa confirmados (S009).
  * O prefixo `*` casa com qualquer origem, entao funciona com ou sem `VITE_API_URL`.
  */
+import { handlersAuth } from './handlersAuth'
 import { handlersEntregas } from './handlersEntregas'
 import { handlersLotes } from './handlersLotes'
 import { handlersAcerto } from './handlersAcerto'
 
 export const handlers = [
+  // T007 — autenticacao (login, refresh)
+  ...handlersAuth,
+
   // T003 — entregas (pendentes, revisao, avulsa, marcar pronto, cancelar, ajustar coordenada)
   ...handlersEntregas,
 
