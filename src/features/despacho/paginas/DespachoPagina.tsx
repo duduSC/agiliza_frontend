@@ -3,7 +3,9 @@
  * e tempo real (T004; lista e revisao da T003).
  */
 import { useEffect } from 'react'
+import { useEstabelecimentoAtual } from '@/features/loja'
 import { useTempoRealDespacho } from '@/shared/realtime'
+import { LimiteDeErro } from '@/shared/ui/LimiteDeErro'
 import { AlertaIntegracao } from '../componentes/AlertaIntegracao'
 import { BarraSelecao } from '../componentes/BarraSelecao'
 import { BotaoNovaEntregaAvulsa } from '../componentes/FormularioEntregaAvulsa'
@@ -23,6 +25,15 @@ export function DespachoPagina() {
   useEffect(() => {
     return () => limparSelecao()
   }, [limparSelecao])
+
+  // Loja do token: centro do mapa e limite do lote (Constituicao 5.6). Enquanto nao chega,
+  // vale o padrao 5 da store; o backend tem a palavra final (LIMITE_LOTE_EXCEDIDO).
+  const loja = useEstabelecimentoAtual()
+  const definirLimite = useSelecaoStore((s) => s.definirLimite)
+  const maxPedidosPorLote = loja.data?.maxPedidosPorLote
+  useEffect(() => {
+    if (maxPedidosPorLote != null && maxPedidosPorLote > 0) definirLimite(maxPedidosPorLote)
+  }, [maxPedidosPorLote, definirLimite])
 
   return (
     <section aria-labelledby="titulo-pagina" className="flex flex-col gap-6">
@@ -47,7 +58,9 @@ export function DespachoPagina() {
       {/* Mapa + listas lado a lado em telas grandes */}
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-6">
-          <MapaDespacho coordenadaLoja={null} />
+          <LimiteDeErro mensagem="Nao foi possivel exibir o mapa. As entregas continuam na lista abaixo.">
+            <MapaDespacho coordenadaLoja={loja.data?.coordenada ?? null} />
+          </LimiteDeErro>
           <ListaPendentes />
         </div>
         <div className="flex flex-col gap-6">

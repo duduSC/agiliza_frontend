@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import type { EntregaResponse } from '@/shared/api'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
 import { useAjustarCoordenada, useEntregasPendentes, useEntregasEmRevisao } from '../api/hooks'
+import { centroDoMapa, type CoordenadaLoja } from '../mapa'
 import { useSelecaoStore } from '../selecaoStore'
 import 'leaflet/dist/leaflet.css'
 
@@ -71,9 +72,8 @@ const ICONE_REVISAO = new L.Icon({
   className: 'hue-rotate-[40deg] saturate-200',
 })
 
-type CoordenadaLoja = { latitude: number; longitude: number } | null
-
 type Props = {
+  /** Coordenada da loja (`GET /api/estabelecimento`); `null` enquanto carrega ou se falhar. */
   coordenadaLoja: CoordenadaLoja
 }
 
@@ -81,22 +81,13 @@ export function MapaDespacho({ coordenadaLoja }: Props) {
   const { data: pendentes } = useEntregasPendentes()
   const { data: revisao } = useEntregasEmRevisao()
 
-  // Centro: coordenada da loja ou padrao (Sao Paulo)
-  const centro = useMemo<[number, number]>(() => {
-    if (coordenadaLoja) return [coordenadaLoja.latitude, coordenadaLoja.longitude]
-    return [-23.55, -46.63]
-  }, [coordenadaLoja])
-
-  // Entregas com coordenada (pendentes)
+  // Entregas com coordenada (pendentes). Sem coordenada nunca vai ao mapa (HU01).
   const entregasNoMapa = useMemo(
     () => (pendentes ?? []).filter((e) => e.coordenada != null),
     [pendentes],
   )
 
-  // Entregas em revisao SEM_COORDENADA que ja receberam coordenada (arrastavel)
-  // Na verdade, SEM_COORDENADA nao tem coordenada -- entao nao aparece no mapa (HU01).
-  // So aparece no mapa se o operador definir via arrastar.
-  // Para isso, mostramos as revisao SEM_COORDENADA com coordenada (que ja foi ajustada).
+  // Entregas em revisao SEM_COORDENADA que ja receberam coordenada (arrastavel).
   const revisaoComCoordenada = useMemo(
     () =>
       (revisao ?? []).filter(
@@ -105,10 +96,16 @@ export function MapaDespacho({ coordenadaLoja }: Props) {
     [revisao],
   )
 
+  const [lat, lng] = centroDoMapa(coordenadaLoja, entregasNoMapa)
+  // O `center` do MapContainer so vale na montagem; a chave remonta o mapa quando o centro
+  // muda de fonte (ex.: a loja chega depois das entregas).
+  const chaveCentro = `${lat},${lng}`
+
   return (
     <div className="relative h-[500px] w-full rounded-lg border" role="application" aria-label="Mapa de entregas">
       <MapContainer
-        center={centro}
+        key={chaveCentro}
+        center={[lat, lng]}
         zoom={13}
         className="h-full w-full rounded-lg"
         scrollWheelZoom

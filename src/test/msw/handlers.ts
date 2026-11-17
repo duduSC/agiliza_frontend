@@ -9,6 +9,7 @@ import { handlersAuth } from './handlersAuth'
 import { handlersEntregas } from './handlersEntregas'
 import { handlersLotes } from './handlersLotes'
 import { handlersAcerto } from './handlersAcerto'
+import { handlersEstabelecimento } from './handlersEstabelecimento'
 
 export const handlers = [
   // T007 — autenticacao (login, refresh)
@@ -22,4 +23,7 @@ export const handlers = [
 
   // T006 — acerto, recibos e caixa (S009)
   ...handlersAcerto,
+
+  // T008 — estabelecimento do token (centro do mapa, maxPedidosPorLote, pagina inicial)
+  ...handlersEstabelecimento,
 ]
