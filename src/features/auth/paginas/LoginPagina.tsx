@@ -7,11 +7,12 @@
  * - Loading no botao, bloqueio de duplo clique.
  */
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { ehErroApi } from '@/shared/api/erros'
 import { MENSAGENS_ERRO } from '@/shared/api/erros'
-import { primeiraTelaDoPerfil } from '@/shared/dominio'
+import { destinoDepoisDoLogin } from '@/shared/dominio'
+import type { EstadoIdaAoLogin } from '../componentes/guardas'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
@@ -26,6 +27,8 @@ const loginSchema = z.object({
 export function LoginPagina() {
   const iniciarSessao = useSessaoStore((s) => s.iniciarSessao)
   const navigate = useNavigate()
+  const local = useLocation()
+  const destinoGuardado = (local.state as EstadoIdaAoLogin | null)?.de
 
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -66,9 +69,8 @@ export function LoginPagina() {
         return
       }
 
-      // Redirecionar para a primeira tela do perfil
-      const destino = primeiraTelaDoPerfil(resposta.usuario.perfil)
-      navigate(destino ?? '/', { replace: true })
+      // T008: volta ao destino guardado (se o perfil puder abri-lo); senao, /inicio.
+      navigate(destinoDepoisDoLogin(resposta.usuario.perfil, destinoGuardado), { replace: true })
     } catch (err) {
       if (ehErroApi(err)) {
         switch (err.codigo) {

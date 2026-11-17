@@ -65,7 +65,7 @@ export const ENDPOINTS = {
     salvarTabela: '/api/faixas-preco', // PROVISORIO — PUT da tabela inteira (DVP 1.5.4)
   },
   estabelecimento: {
-    atual: '/api/estabelecimento', // PROVISORIO — GET/PATCH da loja do token
+    atual: '/api/estabelecimento', // PROVISORIO — GET/PATCH da loja do token (GET existe no backend e respondeu 200 em 17/11, T008)
   },
   integracoes: {
     configuracao: '/api/integracoes', // PROVISORIO — GET/PUT

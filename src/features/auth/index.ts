@@ -15,6 +15,7 @@ export {
   RedirecionarParaInicio,
   CAMINHO_ACESSO_NEGADO,
   CAMINHO_LOGIN,
+  type EstadoIdaAoLogin,
 } from './componentes/guardas'
 export { AcessoNegadoPagina } from './paginas/AcessoNegadoPagina'
 export { LoginPagina } from './paginas/LoginPagina'

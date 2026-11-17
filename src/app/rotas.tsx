@@ -3,6 +3,7 @@
  * chave usada no menu (`shared/dominio/permissoes.ts`), para menu e guarda nunca divergirem.
  *
  * T007: /login fora do ExigirSessao; rotas protegidas redirecionam para /login sem sessao.
+ * T008: /inicio e o destino de / e de rotas desconhecidas.
  */
 import type { ReactNode } from 'react'
 import type { RouteObject } from 'react-router-dom'
@@ -18,6 +19,7 @@ import {
 import { AcertoPagina } from '@/features/acerto'
 import { CaixaPagina } from '@/features/caixa'
 import { DespachoPagina } from '@/features/despacho'
+import { InicioPagina } from '@/features/inicio'
 import {
   EntregadoresPagina,
   FaixasPrecoPagina,
@@ -26,7 +28,7 @@ import {
 } from '@/features/loja'
 import { MonitoramentoPagina } from '@/features/monitoramento'
 import { RestaurantesPagina } from '@/features/restaurantes'
-import { obterTela, type ChaveTela } from '@/shared/dominio'
+import { CAMINHO_INICIO, obterTela, type ChaveTela } from '@/shared/dominio'
 import { LayoutApp } from './LayoutApp'
 
 const PAGINAS: Record<ChaveTela, ReactNode> = {
@@ -59,6 +61,8 @@ export function criarRotas(): RouteObject[] {
       ),
       children: [
         { index: true, element: <RedirecionarParaInicio /> },
+        // T008: pagina inicial, para todo perfil do Backoffice (ExigirSessao ja barra o ENTREGADOR)
+        { path: CAMINHO_INICIO, element: <InicioPagina /> },
         ...telas,
         { path: CAMINHO_ACESSO_NEGADO, element: <AcessoNegadoPagina /> },
         { path: '*', element: <RedirecionarParaInicio /> },

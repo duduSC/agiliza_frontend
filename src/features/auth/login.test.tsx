@@ -1,6 +1,6 @@
 /**
  * Testes da tela de login (T007, UC07, HU13).
- * - Login com sucesso redireciona para a primeira tela do perfil.
+ * - Login com sucesso vai para /inicio, ou para o destino guardado pelo ExigirSessao (T008).
  * - Login com credenciais invalidas mostra mensagem generica (Constituicao 6.7).
  * - ENTREGADOR recebe mensagem especifica (UC07 E4).
  * - Validacao local de campos.
@@ -35,10 +35,10 @@ function EspiaoDeLocal({ local }: { local: { pathname: string } }) {
   return null
 }
 
-function renderizarLogin() {
+function renderizarLogin(estado?: { de?: string }) {
   const local = { pathname: '/login' }
   const resultado = render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[{ pathname: '/login', state: estado }]}>
       <LoginPagina />
       <EspiaoDeLocal local={local} />
     </MemoryRouter>,
@@ -48,6 +48,33 @@ function renderizarLogin() {
 
 beforeEach(() => {
   useSessaoStore.setState({ usuario: null, token: null, refreshToken: null, estabelecimentoId: null })
+})
+
+describe('tela de login - destino guardado (T008)', () => {
+  async function entrarComoOperador() {
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/e-mail/i), 'operador@teste.com')
+    await user.type(screen.getByLabelText(/senha/i), 'senha123')
+    await user.click(screen.getByRole('button', { name: /entrar/i }))
+  }
+
+  it('volta para a rota protegida que mandou ao login', async () => {
+    const { local } = renderizarLogin({ de: '/acerto' })
+    await entrarComoOperador()
+    await waitFor(() => expect(local.pathname).toBe('/acerto'))
+  })
+
+  it('destino que o perfil nao acessa vai para /inicio', async () => {
+    const { local } = renderizarLogin({ de: '/loja/parametros' })
+    await entrarComoOperador()
+    await waitFor(() => expect(local.pathname).toBe('/inicio'))
+  })
+
+  it('destino externo nunca e seguido', async () => {
+    const { local } = renderizarLogin({ de: 'https://exemplo.com/despacho' })
+    await entrarComoOperador()
+    await waitFor(() => expect(local.pathname).toBe('/inicio'))
+  })
 })
 
 describe('tela de login', () => {
@@ -77,28 +104,28 @@ describe('tela de login', () => {
     expect(screen.getByText(/informe um e-mail valido/i)).toBeInTheDocument()
   })
 
-  it('login com sucesso como OPERADOR redireciona para /despacho', async () => {
+  it('login com sucesso como OPERADOR redireciona para /inicio (T008)', async () => {
     const user = userEvent.setup()
     const { local } = renderizarLogin()
     await user.type(screen.getByLabelText(/e-mail/i), 'operador@teste.com')
     await user.type(screen.getByLabelText(/senha/i), 'senha123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
-    await waitFor(() => expect(local.pathname).toBe('/despacho'))
+    await waitFor(() => expect(local.pathname).toBe('/inicio'))
     expect(useSessaoStore.getState().usuario).not.toBeNull()
     expect(useSessaoStore.getState().usuario?.perfil).toBe('OPERADOR')
     expect(useSessaoStore.getState().token).toBe('jwt-operador-mock')
     expect(useSessaoStore.getState().refreshToken).toBe('refresh-token-valido')
   })
 
-  it('login com sucesso como ADMIN_GERAL redireciona para /restaurantes', async () => {
+  it('login com sucesso como ADMIN_GERAL redireciona para /inicio (T008)', async () => {
     const user = userEvent.setup()
     const { local } = renderizarLogin()
     await user.type(screen.getByLabelText(/e-mail/i), 'admin@agiliza.com')
     await user.type(screen.getByLabelText(/senha/i), 'senha123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
-    await waitFor(() => expect(local.pathname).toBe('/restaurantes'))
+    await waitFor(() => expect(local.pathname).toBe('/inicio'))
     expect(useSessaoStore.getState().usuario?.perfil).toBe('ADMIN_GERAL')
   })
 

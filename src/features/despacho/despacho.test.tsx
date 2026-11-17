@@ -27,6 +27,8 @@ import { IDS_ENTREGAS, sementeEntregas } from '@/test/msw/dadosEntregas'
 import { sementeLotes, IDS_LOTES } from '@/test/msw/dadosLotes'
 import { sementeMotoboys } from '@/test/msw/dadosMotoboys'
 import type { EntregaResponse } from '@/shared/api/schemas'
+import { chavesEstabelecimento } from '@/features/loja'
+import { criarEstabelecimentoMock } from '@/test/msw/handlersEstabelecimento'
 import { chavesEntregas, chavesLotes, chavesMotoboys, chavesFalhas } from './api/hooks'
 import { useSelecaoStore } from './selecaoStore'
 import { DespachoPagina } from './paginas/DespachoPagina'
@@ -53,7 +55,7 @@ function dadosRevisao(): EntregaResponse[] {
  * `staleTime: Infinity` evita que o TQ tente refetch automatico (o que
  * falharia por causa do bug do jsdom com AbortSignal).
  */
-function criarQueryClientComDados() {
+function criarQueryClientComDados(maxPedidosPorLote = 5) {
   const qc = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity, refetchOnMount: false, refetchOnWindowFocus: false },
@@ -79,6 +81,11 @@ function criarQueryClientComDados() {
   qc.setQueryData(
     chavesFalhas.pendentes(ESTABELECIMENTO_TESTE),
     2,
+  )
+  // T008: a loja define o centro do mapa e o limite do lote.
+  qc.setQueryData(
+    chavesEstabelecimento.atual(ESTABELECIMENTO_TESTE),
+    criarEstabelecimentoMock({ maxPedidosPorLote }),
   )
   return qc
 }
@@ -472,11 +479,10 @@ describe('selecao multipla (UC01 E2)', () => {
   })
 
   it('selecao limitada a maxPedidosPorLote (UC01 E2)', async () => {
-    // Definir limite de 2
-    useSelecaoStore.setState({ maxPedidosPorLote: 2 })
-
+    // Limite de 2 vindo da loja (GET /api/estabelecimento), nao fixo no cliente (T008)
     const user = userEvent.setup()
-    renderizarDespacho()
+    renderizarDespacho(criarQueryClientComDados(2))
+    await waitFor(() => expect(useSelecaoStore.getState().maxPedidosPorLote).toBe(2))
     const tabela = screen.getByRole('table', { name: 'Entregas aguardando despacho' })
 
     // Selecionar 2 entregas

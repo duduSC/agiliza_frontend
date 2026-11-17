@@ -3,11 +3,12 @@
  * Desktop: menu lateral. Tablet/telas estreitas: menu em faixa horizontal acima do conteudo.
  *
  * T007: removido badge "sessao dev"; logout redireciona para /login.
+ * T008: "Inicio" como primeiro item do menu.
  */
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { CAMINHO_LOGIN, useSessaoStore } from '@/features/auth'
-import { LABEL_PERFIL_USUARIO, telasDoPerfil } from '@/shared/dominio'
+import { CAMINHO_INICIO, LABEL_PERFIL_USUARIO, TITULO_INICIO, telasDoPerfil } from '@/shared/dominio'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -18,7 +19,11 @@ export function LayoutApp() {
 
   // ExigirSessao garante a sessao; isto so satisfaz o tipo.
   if (!usuario) return null
-  const telas = telasDoPerfil(usuario.perfil)
+  // T008: "Inicio" e sempre o primeiro item do menu.
+  const itensMenu = [
+    { chave: 'inicio', caminho: CAMINHO_INICIO, titulo: TITULO_INICIO },
+    ...telasDoPerfil(usuario.perfil),
+  ]
 
   function sair() {
     encerrarSessao()
@@ -51,7 +56,7 @@ export function LayoutApp() {
           className="border-b bg-slate-50 md:w-56 md:shrink-0 md:border-r md:border-b-0"
         >
           <ul className="flex gap-1 overflow-x-auto p-2 md:flex-col">
-            {telas.map((tela) => (
+            {itensMenu.map((tela) => (
               <li key={tela.chave}>
                 <NavLink
                   to={tela.caminho}
