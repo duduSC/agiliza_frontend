@@ -1,6 +1,6 @@
 # T008 — Página inicial depois do login e despacho travando com o backend real
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F7 (integração para 17/11)
 **Depende de:** T007
 **Referências no DVP:** UC01 (despacho), HU01–HU03, RNF02 (painel em até 5 s)
