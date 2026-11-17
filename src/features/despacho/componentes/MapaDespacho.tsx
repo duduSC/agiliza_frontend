@@ -30,6 +30,14 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
+/**
+ * Icone padrao EXPLICITO (T008). Passar `icon={undefined}` ao `<Marker>` do react-leaflet
+ * sobrescreve o icone padrao do Leaflet com `undefined` e quebra com
+ * "Cannot read properties of undefined (reading 'createIcon')" -- era isso que derrubava
+ * a tela de Despacho com o backend real (relatorio T008).
+ */
+const ICONE_PADRAO = new L.Icon.Default()
+
 const ICONE_LOJA = new L.Icon({
   iconUrl: markerIcon,
   iconRetinaUrl: markerIcon2x,
@@ -156,7 +164,7 @@ function PinoEntrega({ entrega }: { entrega: EntregaResponse }) {
   return (
     <Marker
       position={[entrega.coordenada.latitude, entrega.coordenada.longitude]}
-      icon={estaSelecionada ? ICONE_SELECIONADO : undefined}
+      icon={estaSelecionada ? ICONE_SELECIONADO : ICONE_PADRAO}
       eventHandlers={{ click: aoClicar }}
     >
       <Popup>

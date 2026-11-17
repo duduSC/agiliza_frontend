@@ -14,21 +14,32 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'mapa-leaflet' }, children),
   TileLayer: () => null,
-  Marker: ({ children, eventHandlers }: { children: React.ReactNode; eventHandlers?: { click?: () => void } }) =>
-    React.createElement('div', { 'data-testid': 'pino-mapa', onClick: eventHandlers?.click }, children),
+  Marker: (props: {
+    children: React.ReactNode
+    icon?: unknown
+    eventHandlers?: { click?: () => void }
+  }) => {
+    // Reproduz o Leaflet real (T008): `icon` presente porem `undefined` sobrescreve o icone
+    // padrao e o Leaflet quebra em `options.icon.createIcon()`.
+    if ('icon' in props && props.icon == null) {
+      throw new TypeError("Cannot read properties of undefined (reading 'createIcon')")
+    }
+    return React.createElement(
+      'div',
+      { 'data-testid': 'pino-mapa', onClick: props.eventHandlers?.click },
+      props.children,
+    )
+  },
   Popup: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children),
 }))
 
 vi.mock('leaflet', () => {
-  const Icon = function () {} as unknown as {
-    new (): unknown
-    Default: { prototype: Record<string, unknown>; mergeOptions: () => void }
+  class Icon {
+    static Default = class {
+      static mergeOptions() {}
+    }
   }
-  Icon.Default = {
-    prototype: {},
-    mergeOptions: () => {},
-  } as unknown as (typeof Icon)['Default']
   return {
     default: { Icon, icon: () => ({}) },
     Icon,
