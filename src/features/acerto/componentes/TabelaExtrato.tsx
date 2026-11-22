@@ -7,6 +7,8 @@ import type { LinhaExtratoResponse } from '@/shared/api/schemas'
 import { LABEL_SITUACAO_ACERTO, LABEL_STATUS_ENTREGA } from '@/shared/dominio'
 import { formatarDataHora, formatarMoeda, formatarKm } from '@/shared/formatacao'
 import { Badge } from '@/shared/ui/badge'
+import { Button } from '@/shared/ui/button'
+import type { SituacaoCaixa } from '../regras'
 import {
   Table,
   TableBody,
@@ -19,7 +21,11 @@ import {
 type Props = {
   linhas: LinhaExtratoResponse[]
   aoSelecionarEntrega?: (entregaId: string) => void
+  /** Caixa do dia de cada entrega: so ABERTO oferece ajuste (Constituicao 5.2). */
+  caixaDaLinha?: (linha: LinhaExtratoResponse) => SituacaoCaixa
 }
+
+const formatadorFaixa = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 
 function badgeSituacao(situacao: LinhaExtratoResponse['situacao']) {
   switch (situacao) {
@@ -29,18 +35,18 @@ function badgeSituacao(situacao: LinhaExtratoResponse['situacao']) {
       return <Badge variant="secondary">{LABEL_SITUACAO_ACERTO.CONSOLIDADA}</Badge>
     case 'EM_REVISAO':
       return (
-        <Badge variant="destructive" aria-label="Em revisao - requer atencao">
+        <Badge variant="destructive" aria-label="Em revisão: requer atenção">
           {LABEL_SITUACAO_ACERTO.EM_REVISAO}
         </Badge>
       )
   }
 }
 
-export function TabelaExtrato({ linhas, aoSelecionarEntrega }: Props) {
+export function TabelaExtrato({ linhas, aoSelecionarEntrega, caixaDaLinha = () => 'ABERTO' }: Props) {
   if (linhas.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-muted-foreground">
-        Nenhuma entrega encontrada para o periodo selecionado.
+        Nenhuma entrega encontrada para o período selecionado.
       </p>
     )
   }
@@ -53,11 +59,11 @@ export function TabelaExtrato({ linhas, aoSelecionarEntrega }: Props) {
             <TableHead>Cliente</TableHead>
             <TableHead>Data</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Distancia</TableHead>
+            <TableHead className="text-right">Distância</TableHead>
             <TableHead>Faixa</TableHead>
             <TableHead className="text-right">Repasse</TableHead>
-            <TableHead>Situacao</TableHead>
-            <TableHead>Acoes</TableHead>
+            <TableHead>Situação</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -72,27 +78,31 @@ export function TabelaExtrato({ linhas, aoSelecionarEntrega }: Props) {
               <TableCell className="text-right">{formatarKm(linha.distanciaKm)}</TableCell>
               <TableCell>
                 {linha.faixaDeKm != null && linha.faixaAteKm != null
-                  ? `${linha.faixaDeKm}-${linha.faixaAteKm} km`
+                  ? `${formatadorFaixa.format(linha.faixaDeKm)} a ${formatadorFaixa.format(linha.faixaAteKm)} km`
                   : linha.foraDeArea
-                    ? 'Fora de area'
+                    ? 'Fora de área'
                     : '—'}
               </TableCell>
               <TableCell className="text-right">{formatarMoeda(linha.valorRepasse)}</TableCell>
               <TableCell>{badgeSituacao(linha.situacao)}</TableCell>
               <TableCell>
-                {linha.situacao === 'A_ACERTAR' && !linha.reciboId && aoSelecionarEntrega && (
-                  <button
-                    type="button"
-                    className="text-sm text-blue-600 underline hover:text-blue-800"
-                    onClick={() => aoSelecionarEntrega(linha.entregaId)}
-                  >
-                    Ajustar
-                  </button>
-                )}
+                {linha.situacao === 'A_ACERTAR' &&
+                  !linha.reciboId &&
+                  aoSelecionarEntrega &&
+                  caixaDaLinha(linha) === 'ABERTO' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => aoSelecionarEntrega(linha.entregaId)}
+                    >
+                      Ajustar
+                    </Button>
+                  )}
                 {linha.reciboId && (
-                  <span className="text-xs text-muted-foreground">
-                    Recibo vinculado
-                  </span>
+                  <p className="max-w-56 text-xs whitespace-normal text-muted-foreground">
+                    No recibo #{linha.reciboId.slice(0, 8)}. Para corrigir, cancele o recibo antes.
+                  </p>
                 )}
               </TableCell>
             </TableRow>

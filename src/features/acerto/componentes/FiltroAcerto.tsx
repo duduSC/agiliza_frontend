@@ -23,10 +23,13 @@ export function FiltroAcerto({ motoboys, aoFiltrar, carregando }: Props) {
   const [motoboyId, setMotoboyId] = useState('')
   const [inicio, setInicio] = useState('')
   const [fim, setFim] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (motoboyId && inicio && fim) {
+    const invertido = fim < inicio
+    setErro(invertido ? 'A data final não pode ser anterior à inicial.' : null)
+    if (motoboyId && inicio && fim && !invertido) {
       aoFiltrar({ motoboyId, inicio, fim })
     }
   }
@@ -34,7 +37,7 @@ export function FiltroAcerto({ motoboys, aoFiltrar, carregando }: Props) {
   const podeSubmeter = motoboyId !== '' && inicio !== '' && fim !== ''
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="filtro-motoboy">Entregador</Label>
         <select
@@ -54,7 +57,7 @@ export function FiltroAcerto({ motoboys, aoFiltrar, carregando }: Props) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="filtro-inicio">Data inicio</Label>
+        <Label htmlFor="filtro-inicio">Data início</Label>
         <Input
           id="filtro-inicio"
           type="date"
@@ -76,8 +79,13 @@ export function FiltroAcerto({ motoboys, aoFiltrar, carregando }: Props) {
       </div>
 
       <Button type="submit" disabled={!podeSubmeter || carregando}>
-        {carregando ? 'Carregando...' : 'Filtrar'}
+        {carregando ? 'Carregando…' : 'Filtrar'}
       </Button>
+      {erro && (
+        <p role="alert" className="basis-full text-sm text-red-700">
+          {erro}
+        </p>
+      )}
     </form>
   )
 }

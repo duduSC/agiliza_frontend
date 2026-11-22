@@ -243,7 +243,7 @@ describe('legenda do mapa (Constituicao 7.6)', () => {
     const legenda = screen.getByRole('region', { name: /legenda do mapa/i })
     expect(within(legenda).getByText('Online')).toBeInTheDocument()
     expect(within(legenda).getByText('Em rota')).toBeInTheDocument()
-    expect(within(legenda).getByText('Posicao desatualizada')).toBeInTheDocument()
+    expect(within(legenda).getByText('Posição desatualizada')).toBeInTheDocument()
   })
 })
 
@@ -267,6 +267,6 @@ describe('pagina de monitoramento (composicao)', () => {
   it('exibe titulo e descricao', () => {
     renderizarMonitoramento()
     expect(screen.getByRole('heading', { level: 1, name: /monitoramento/i })).toBeInTheDocument()
-    expect(screen.getByText(/posicao da frota em tempo real/i)).toBeInTheDocument()
+    expect(screen.getByText(/posição da frota em tempo real/i)).toBeInTheDocument()
   })
 })

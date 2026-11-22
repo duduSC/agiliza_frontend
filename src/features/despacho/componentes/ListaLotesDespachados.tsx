@@ -6,9 +6,11 @@ import { toast } from 'sonner'
 import type { LoteEntregaResponse } from '@/shared/api/schemas'
 import { LABEL_STATUS_LOTE } from '@/shared/dominio'
 import { formatarMoeda } from '@/shared/formatacao'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useDevolverLote, useLotesDespachados } from '../api/hooks'
 import { mensagemDoErro } from '../util'
 
@@ -17,7 +19,7 @@ export function ListaLotesDespachados() {
 
   let estado: EstadoTela
   if (consulta.isPending) estado = { tipo: 'carregando' }
-  else if (consulta.isError)
+  else if (consulta.data === undefined)
     estado = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -27,7 +29,7 @@ export function ListaLotesDespachados() {
     estado = {
       tipo: 'vazio',
       titulo: 'Nenhum lote despachado',
-      descricao: 'Lotes despachados aparecem aqui enquanto nao sairam para rota.',
+      descricao: 'Lotes despachados aparecem aqui enquanto não saem para entrega.',
     }
   else
     estado = {
@@ -51,6 +53,7 @@ export function ListaLotesDespachados() {
           </span>
         )}
       </h2>
+      <AvisoDesatualizado consulta={consulta} />
       <ConteudoPorEstado estado={estado} />
     </section>
   )
@@ -60,15 +63,16 @@ function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
   const devolver = useDevolverLote()
   const podeDevolver = lote.status === 'DESPACHADO'
 
-  const aoDevolver = async () => {
-    if (devolver.isPending) return
-    try {
-      await devolver.mutateAsync(lote.id)
-      toast.success(`Lote com ${lote.qtdEntregas} entrega(s) devolvido.`)
-    } catch (erro) {
-      toast.error(mensagemDoErro(erro))
-    }
-  }
+  const envioUnico = useEnvioUnico()
+  const aoDevolver = () =>
+    void envioUnico(async () => {
+      try {
+        await devolver.mutateAsync(lote.id)
+        toast.success(`Lote com ${lote.qtdEntregas} entrega(s) devolvido.`)
+      } catch (erro) {
+        toast.error(mensagemDoErro(erro))
+      }
+    })
 
   return (
     <li
@@ -98,7 +102,7 @@ function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
             disabled={devolver.isPending}
             aria-label={`Devolver lote com ${lote.qtdEntregas} entregas`}
           >
-            {devolver.isPending ? 'Devolvendo...' : 'Devolver lote'}
+            {devolver.isPending ? 'Devolvendo…' : 'Devolver lote'}
           </Button>
         </div>
       )}

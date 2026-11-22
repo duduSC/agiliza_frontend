@@ -160,7 +160,7 @@ describe('lista de pendentes (AGUARDANDO_DESPACHO sem revisao)', () => {
     const tabela = screen.getByRole('table', { name: 'Entregas aguardando despacho' })
     const linhaBruno = within(tabela).getByTestId(`pendente-${IDS_ENTREGAS.pendenteSemRepasse}`)
     // Repasse null mostra --
-    expect(within(linhaBruno).getByTitle('Repasse ainda nao calculado')).toHaveTextContent('—')
+    expect(within(linhaBruno).getByTitle('Repasse ainda não calculado')).toHaveTextContent('—')
   })
 
   it('nao exibe entregas em revisao na lista de pendentes (Constituicao 5.4)', () => {
@@ -212,7 +212,7 @@ describe('lista de revisao', () => {
 
     const cartao3 = screen.getByTestId(`revisao-${IDS_ENTREGAS.revisaoContestacao}`)
     expect(within(cartao3).getByText(/contesta/i)).toBeInTheDocument()
-    expect(within(cartao3).getByText(/tela de acerto/i)).toBeInTheDocument()
+    expect(within(cartao3).getByText(/fora do recibo/i)).toBeInTheDocument()
   })
 
   it('mostra estado vazio quando nao ha entregas em revisao', () => {
@@ -601,7 +601,7 @@ describe('lotes despachados (UC01 A4)', () => {
 describe('alerta de integracao degradada (UC01 A3)', () => {
   it('mostra banner quando ha falhas pendentes', () => {
     renderizarDespacho()
-    expect(screen.getByText(/integracao degradada/i)).toBeInTheDocument()
+    expect(screen.getByText(/integração degradada/i)).toBeInTheDocument()
     expect(screen.getByText(/2 falha/i)).toBeInTheDocument()
   })
 
@@ -609,7 +609,7 @@ describe('alerta de integracao degradada (UC01 A3)', () => {
     const qc = criarQueryClientComDados()
     qc.setQueryData(chavesFalhas.pendentes(ESTABELECIMENTO_TESTE), 0)
     renderizarDespacho(qc)
-    expect(screen.queryByText(/integracao degradada/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/integração degradada/i)).not.toBeInTheDocument()
   })
 })
 

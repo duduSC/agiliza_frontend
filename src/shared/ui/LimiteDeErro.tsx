@@ -24,8 +24,8 @@ export class LimiteDeErro extends Component<Props, Estado> {
   }
 
   override componentDidCatch(erro: Error): void {
-    // So o nome/mensagem do erro, nunca dados de pedido.
-    console.error('[LimiteDeErro]', erro.name, erro.message)
+    // A mensagem pode carregar dado de pedido (o Leaflet inclui a coordenada): so em dev.
+    console.error('[LimiteDeErro]', erro.name, import.meta.env.DEV ? erro.message : '')
   }
 
   private tentarNovamente = () => this.setState({ falhou: false })

@@ -101,7 +101,7 @@ describe('tela de login', () => {
     await user.type(screen.getByLabelText(/e-mail/i), 'nao-e-email')
     await user.type(screen.getByLabelText(/senha/i), 'senha123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
-    expect(screen.getByText(/informe um e-mail valido/i)).toBeInTheDocument()
+    expect(screen.getByText(/informe um e-mail válido/i)).toBeInTheDocument()
   })
 
   it('login com sucesso como OPERADOR redireciona para /inicio (T008)', async () => {

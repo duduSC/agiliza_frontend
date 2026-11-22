@@ -10,10 +10,11 @@ type ItemLegenda = {
 }
 
 const itens: ItemLegenda[] = [
+  { cor: 'bg-red-500', rotulo: 'Loja', descricao: 'Posição do estabelecimento' },
   {
     cor: 'bg-blue-500',
     rotulo: 'Online',
-    descricao: 'Entregador disponivel, sem entrega em andamento',
+    descricao: 'Entregador disponível, sem entrega em andamento',
   },
   {
     cor: 'bg-emerald-500',
@@ -22,14 +23,14 @@ const itens: ItemLegenda[] = [
   },
   {
     cor: 'bg-amber-500',
-    rotulo: 'Posicao desatualizada',
-    descricao: 'Sem transmitir ha mais de 3 minutos',
+    rotulo: 'Posição desatualizada',
+    descricao: 'Sem transmitir há mais de 3 minutos',
   },
 ]
 
 export function LegendaFrota() {
   return (
-    <div className="flex flex-wrap gap-4 rounded-lg border p-3 text-sm" role="region" aria-label="Legenda do mapa">
+    <div className="flex flex-wrap gap-4 rounded-lg border px-3 py-2 text-sm" role="region" aria-label="Legenda do mapa">
       {itens.map((item) => (
         <div key={item.rotulo} className="flex items-center gap-2" title={item.descricao}>
           <span

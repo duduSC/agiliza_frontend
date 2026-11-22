@@ -7,70 +7,22 @@
  * - Clicar no pino seleciona/desseleciona a entrega.
  * - Popup com resumo (cliente, bairro, distancia, repasse ou "--").
  * - Pino arrastavel para entregas em revisao SEM_COORDENADA (UC01 A1).
+ * - Enquadra a loja e todos os pinos; rotulo de texto alem da cor (T009).
  */
-import { useCallback, useMemo } from 'react'
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
-import L from 'leaflet'
+import { useCallback, useMemo, useState } from 'react'
+import { MapContainer, Marker, Popup, TileLayer, Tooltip } from 'react-leaflet'
+import type L from 'leaflet'
 import { toast } from 'sonner'
 import type { EntregaResponse } from '@/shared/api'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
 import { useAjustarCoordenada, useEntregasPendentes, useEntregasEmRevisao } from '../api/hooks'
 import { centroDoMapa, type CoordenadaLoja } from '../mapa'
+import { EnquadrarMapa } from '@/shared/ui/mapa/EnquadrarMapa'
+import type { PontoDoMapa } from '@/shared/ui/mapa/enquadramento'
+import { PINO_AMBAR, PINO_AZUL, PINO_VERDE_GRANDE, PINO_VERMELHO } from '@/shared/ui/mapa/icones'
 import { useSelecaoStore } from '../selecaoStore'
+import { mensagemDoErro } from '../util'
 import 'leaflet/dist/leaflet.css'
-
-// Corrigir icones padrao do Leaflet em builds com bundler
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
-
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
-
-/**
- * Icone padrao EXPLICITO (T008). Passar `icon={undefined}` ao `<Marker>` do react-leaflet
- * sobrescreve o icone padrao do Leaflet com `undefined` e quebra com
- * "Cannot read properties of undefined (reading 'createIcon')" -- era isso que derrubava
- * a tela de Despacho com o backend real (relatorio T008).
- */
-const ICONE_PADRAO = new L.Icon.Default()
-
-const ICONE_LOJA = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: 'hue-rotate-[200deg] saturate-150',
-})
-
-const ICONE_SELECIONADO = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [30, 48],
-  iconAnchor: [15, 48],
-  popupAnchor: [1, -40],
-  shadowSize: [41, 41],
-  className: 'hue-rotate-[120deg] saturate-200',
-})
-
-const ICONE_REVISAO = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: 'hue-rotate-[40deg] saturate-200',
-})
 
 type Props = {
   /** Coordenada da loja (`GET /api/estabelecimento`); `null` enquanto carrega ou se falhar. */
@@ -96,16 +48,25 @@ export function MapaDespacho({ coordenadaLoja }: Props) {
     [revisao],
   )
 
-  const [lat, lng] = centroDoMapa(coordenadaLoja, entregasNoMapa)
-  // O `center` do MapContainer so vale na montagem; a chave remonta o mapa quando o centro
-  // muda de fonte (ex.: a loja chega depois das entregas).
-  const chaveCentro = `${lat},${lng}`
+  const pontos = useMemo<PontoDoMapa[]>(
+    () => [
+      ...(coordenadaLoja ? [{ id: 'loja', ...coordenadaLoja }] : []),
+      ...[...entregasNoMapa, ...revisaoComCoordenada].map((e) => ({ id: e.id, ...e.coordenada! })),
+    ],
+    [coordenadaLoja, entregasNoMapa, revisaoComCoordenada],
+  )
+
+  // O `center` so vale na montagem; depois quem posiciona e o EnquadrarMapa.
+  const centro = centroDoMapa(coordenadaLoja, entregasNoMapa)
 
   return (
-    <div className="relative h-[500px] w-full rounded-lg border" role="application" aria-label="Mapa de entregas">
+    <div
+      className="relative isolate h-[50vh] min-h-[320px] w-full rounded-lg border"
+      role="region"
+      aria-label="Mapa de entregas"
+    >
       <MapContainer
-        key={chaveCentro}
-        center={[lat, lng]}
+        center={centro}
         zoom={13}
         className="h-full w-full rounded-lg"
         scrollWheelZoom
@@ -115,12 +76,19 @@ export function MapaDespacho({ coordenadaLoja }: Props) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <EnquadrarMapa pontos={pontos} />
+
         {/* Pino da loja */}
         {coordenadaLoja && (
           <Marker
             position={[coordenadaLoja.latitude, coordenadaLoja.longitude]}
-            icon={ICONE_LOJA}
+            icon={PINO_VERMELHO}
+            title="Loja"
+            alt="Loja"
           >
+            <Tooltip permanent direction="top">
+              Loja
+            </Tooltip>
             <Popup>
               <strong>Estabelecimento</strong>
             </Popup>
@@ -146,6 +114,7 @@ function PinoEntrega({ entrega }: { entrega: EntregaResponse }) {
   const alternarSelecao = useSelecaoStore((s) => s.alternarSelecao)
   const limiteAtingido = useSelecaoStore((s) => s.limiteAtingido)
   const maxPedidosPorLote = useSelecaoStore((s) => s.maxPedidosPorLote)
+  const posicao = useSelecaoStore((s) => [...s.selecionadas].indexOf(entrega.id) + 1)
 
   const aoClicar = useCallback(() => {
     const sucesso = alternarSelecao(entrega.id)
@@ -161,14 +130,21 @@ function PinoEntrega({ entrega }: { entrega: EntregaResponse }) {
   return (
     <Marker
       position={[entrega.coordenada.latitude, entrega.coordenada.longitude]}
-      icon={estaSelecionada ? ICONE_SELECIONADO : ICONE_PADRAO}
+      icon={estaSelecionada ? PINO_VERDE_GRANDE : PINO_AZUL}
+      title={`Entrega de ${entrega.nomeCliente}`}
+      alt={`Entrega de ${entrega.nomeCliente}`}
       eventHandlers={{ click: aoClicar }}
     >
+      {posicao > 0 && (
+        <Tooltip permanent direction="top">
+          <strong>{posicao}</strong>
+        </Tooltip>
+      )}
       <Popup>
         <div className="min-w-[160px] text-sm">
           <p className="font-semibold">{entrega.nomeCliente}</p>
           {entrega.bairro && <p className="text-muted-foreground">{entrega.bairro}</p>}
-          <p>Distancia: {formatarKm(entrega.distanciaKm)}</p>
+          <p>Distância: {formatarKm(entrega.distanciaKm)}</p>
           <p>Repasse: {formatarMoeda(entrega.valorRepasse)}</p>
           <p className="mt-1 text-xs">
             {estaSelecionada ? 'Selecionada' : limiteAtingido() ? 'Limite atingido' : 'Clique para selecionar'}
@@ -181,20 +157,24 @@ function PinoEntrega({ entrega }: { entrega: EntregaResponse }) {
 
 function PinoRevisaoArrastavel({ entrega }: { entrega: EntregaResponse }) {
   const ajustar = useAjustarCoordenada()
+  // O Leaflet ja moveu o pino: na recusa, remonta para ele voltar ao que o servidor tem.
+  const [recusas, setRecusas] = useState(0)
 
   const aoArrastarFim = useCallback(
     (evento: L.DragEndEvent) => {
       const marcador = evento.target as L.Marker
       const pos = marcador.getLatLng()
       ajustar.mutate(
-        { id: entrega.id, coordenada: { latitude: pos.lat, longitude: pos.lng } },
+        { id: entrega.id, coordenada: { latitude: Number(pos.lat.toFixed(7)), longitude: Number(pos.lng.toFixed(7)) } },
         {
           onSuccess: () =>
             toast.success(
-              `Coordenada de ${entrega.nomeCliente} atualizada. A distancia e recalculada pelo sistema.`,
+              `Coordenada de ${entrega.nomeCliente} atualizada. A distância é recalculada pelo sistema.`,
             ),
-          onError: () =>
-            toast.error('Nao foi possivel atualizar a coordenada. Tente novamente.'),
+          onError: (erro) => {
+            setRecusas((n) => n + 1)
+            toast.error(mensagemDoErro(erro))
+          },
         },
       )
     },
@@ -205,16 +185,18 @@ function PinoRevisaoArrastavel({ entrega }: { entrega: EntregaResponse }) {
 
   return (
     <Marker
+      key={recusas}
       position={[entrega.coordenada.latitude, entrega.coordenada.longitude]}
-      icon={ICONE_REVISAO}
+      icon={PINO_AMBAR}
+      title={`Em revisão: entrega de ${entrega.nomeCliente}`}
       draggable
       eventHandlers={{ dragend: aoArrastarFim }}
     >
       <Popup>
         <div className="min-w-[160px] text-sm">
           <p className="font-semibold">{entrega.nomeCliente}</p>
-          <p className="text-amber-700">Revisao: sem coordenada</p>
-          <p className="text-xs">Arraste o pino para definir a posicao</p>
+          <p className="text-amber-700">Revisão: sem coordenada</p>
+          <p className="text-xs">Arraste o pino para definir a posição</p>
         </div>
       </Popup>
     </Marker>

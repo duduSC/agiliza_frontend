@@ -14,7 +14,7 @@ import type {
 } from '@/shared/api/schemas'
 
 export const IDS = {
-  estabelecimento: '6f1c2a3b-4d5e-4f60-8a71-0b2c3d4e5f60',
+  estabelecimento: 'a1b2c3d4-0001-4a00-8a00-00000000d001',
   entrega: '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d',
   caixa: '1b2c3d4e-5f6a-4b7c-9d8e-9f0a1b2c3d4e',
   lote: '2c3d4e5f-6a7b-4c8d-ae9f-0a1b2c3d4e5f',
@@ -25,12 +25,35 @@ export function criarEntregaResponse(sobrescrever: Partial<EntregaResponse> = {}
   return {
     id: IDS.entrega,
     estabelecimentoId: IDS.estabelecimento,
+    pedidoExternoId: null,
+    loteId: null,
+    faixaPrecoId: null,
+    reciboId: null,
     nomeCliente: 'Cliente Exemplo',
+    telefoneCliente: null,
     enderecoCompleto: 'Rua Exemplo, 100 - Centro',
+    bairro: null,
+    cep: null,
+    complemento: null,
+    pontoReferencia: null,
+    coordenada: null,
+    valorPedido: null,
+    formaPagamento: null,
     pagoOnline: false,
+    trocoPara: null,
+    observacoes: null,
+    distanciaKm: null,
+    valorRepasse: null,
     status: 'AGUARDANDO_DESPACHO',
+    motivoFalha: null,
     pendenteRevisao: false,
-    criadoEm: '2026-11-09T21:30:00',
+    motivoRevisao: null,
+    prontoParaDespachoEm: null,
+    despachadaEm: null,
+    finalizadaEm: null,
+    ordemRota: null,
+    criadoEm: '2026-11-09T21:30:00.123456',
+    atualizadoEm: '2026-11-09T21:30:00.123456',
     ...sobrescrever,
   }
 }
@@ -41,8 +64,16 @@ export function criarCaixaResponse(sobrescrever: Partial<CaixaResponse> = {}): C
     estabelecimentoId: IDS.estabelecimento,
     dataReferencia: '2026-11-09',
     abertoEm: '2026-11-09T08:00:00',
+    fechadoEm: null,
+    usuarioFechamentoId: null,
     status: 'ABERTO',
-    criadoEm: '2026-11-09T08:00:00',
+    qtdRecibos: null,
+    valorTotal: null,
+    reabertoEm: null,
+    usuarioReaberturaId: null,
+    motivoReabertura: null,
+    criadoEm: '2026-11-09T08:00:00.123456',
+    atualizadoEm: '2026-11-09T08:00:00.123456',
     ...sobrescrever,
   }
 }
@@ -52,10 +83,14 @@ export function criarLoteResponse(sobrescrever: Partial<LoteEntregaResponse> = {
     id: IDS.lote,
     estabelecimentoId: IDS.estabelecimento,
     motoboyId: IDS.motoboy,
-    usuarioDespachanteId: '4e5f6a7b-8c9d-4e0f-c1a2-3b4c5d6e7f8a',
+    usuarioDespachanteId: '4e5f6a7b-8c9d-4e0f-a1a2-3b4c5d6e7f8a',
     status: 'DESPACHADO',
     qtdEntregas: 2,
-    criadoEm: '2026-11-11T10:00:00',
+    valorTotalRepasse: null,
+    despachadoEm: '2026-11-11T10:00:00.123456',
+    concluidoEm: null,
+    criadoEm: '2026-11-11T10:00:00.123456',
+    atualizadoEm: '2026-11-11T10:00:00.123456',
     ...sobrescrever,
   }
 }
@@ -63,12 +98,16 @@ export function criarLoteResponse(sobrescrever: Partial<LoteEntregaResponse> = {
 export function criarMotoboyResponse(sobrescrever: Partial<MotoboyResponse> = {}): MotoboyResponse {
   return {
     id: IDS.motoboy,
-    usuarioId: '5f6a7b8c-9d0e-4f1a-d2b3-4c5d6e7f8a9b',
+    usuarioId: '5f6a7b8c-9d0e-4f1a-a2b3-4c5d6e7f8a9b',
     nome: 'Entregador Exemplo',
     telefone: '(11) 99999-0001',
+    placaVeiculo: null,
     statusCadastro: 'ATIVO',
     statusDisponibilidade: 'ONLINE',
-    criadoEm: '2026-11-09T08:00:00',
+    ultimaPosicao: null,
+    ultimaPosicaoEm: null,
+    criadoEm: '2026-11-09T08:00:00.123456',
+    atualizadoEm: '2026-11-09T08:00:00.123456',
     ...sobrescrever,
   }
 }
@@ -86,7 +125,9 @@ export function criarReciboResponse(sobrescrever: Partial<ReciboResponse> = {}):
     qtdEntregas: 2,
     valorTotal: 18,
     status: 'GERADO',
-    criadoEm: '2026-11-09T17:00:00',
+    pagoEm: null,
+    criadoEm: '2026-11-09T17:00:00.123456',
+    atualizadoEm: '2026-11-09T17:00:00.123456',
     ...sobrescrever,
   }
 }

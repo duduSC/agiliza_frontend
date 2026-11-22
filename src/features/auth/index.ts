@@ -17,5 +17,6 @@ export {
   CAMINHO_LOGIN,
   type EstadoIdaAoLogin,
 } from './componentes/guardas'
+export { renovarToken } from './api/authApi'
 export { AcessoNegadoPagina } from './paginas/AcessoNegadoPagina'
 export { LoginPagina } from './paginas/LoginPagina'

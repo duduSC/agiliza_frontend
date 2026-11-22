@@ -1,6 +1,6 @@
 /**
  * Chamadas de rede dos entregadores para o despacho (UC01 E1).
- * PROVISORIO: o backend ainda nao tem controller de motoboys.
+ * Endpoint confirmado pelo backend (S008).
  */
 import { z } from 'zod'
 import { ENDPOINTS, requisitar } from '@/shared/api'

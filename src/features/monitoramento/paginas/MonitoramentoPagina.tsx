@@ -9,7 +9,11 @@
  */
 import { useEffect, useState } from 'react'
 import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/shared/ui/estados'
-import { IndicadorTempoReal } from '@/features/despacho/componentes/IndicadorTempoReal'
+import { useEstabelecimentoAtual } from '@/features/loja'
+import { ehErroApi } from '@/shared/api/erros'
+import { IndicadorTempoReal } from '@/shared/realtime/IndicadorTempoReal'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
+import { LimiteDeErro } from '@/shared/ui/LimiteDeErro'
 import { useEntregadoresNoMapa } from '../api/hooks'
 import { useTempoRealFrota } from '../api/useTempoRealFrota'
 import { LegendaFrota } from '../componentes/LegendaFrota'
@@ -30,18 +34,21 @@ export function MonitoramentoPagina() {
   // Conectar STOMP para o topico de frota
   useTempoRealFrota()
 
-  const { data: entregadores, isLoading, isError, refetch } = useEntregadoresNoMapa()
+  const consulta = useEntregadoresNoMapa()
+  const { data: entregadores, isLoading, error, refetch } = consulta
+  const isError = consulta.isError && entregadores === undefined
+  const loja = useEstabelecimentoAtual()
   const agora = useAgoraReativo()
 
   return (
-    <section aria-labelledby="titulo-pagina" className="flex flex-col gap-6">
+    <section aria-labelledby="titulo-pagina" className="flex flex-col gap-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 id="titulo-pagina" className="text-xl font-semibold">
             Monitoramento
           </h1>
           <p className="text-sm text-muted-foreground">
-            Posicao da frota em tempo real.
+            Posição da frota em tempo real.
           </p>
         </div>
         <IndicadorTempoReal />
@@ -50,30 +57,34 @@ export function MonitoramentoPagina() {
       <LegendaFrota />
 
       {/* Estados carregando, erro e vazio (Constituicao 7.3) */}
-      {isLoading && <EstadoCarregando mensagem="Carregando posicao dos entregadores..." />}
+      {isLoading && <EstadoCarregando mensagem="Carregando posição dos entregadores…" />}
 
       {isError && (
         <EstadoErro
-          mensagem="Nao foi possivel carregar a posicao dos entregadores."
+          mensagem={`Não foi possível carregar a posição dos entregadores. ${ehErroApi(error) ? error.mensagem : ''}`}
           aoTentarNovamente={() => void refetch()}
         />
       )}
 
+      <AvisoDesatualizado consulta={consulta} />
+
       {!isLoading && !isError && entregadores && entregadores.length === 0 && (
         <EstadoVazio
           titulo="Nenhum entregador online"
-          descricao="Quando um entregador ficar online ou em rota, ele aparecera aqui."
+          descricao="Quando um entregador ficar online ou em rota, ele aparecerá aqui."
         />
       )}
 
       {!isLoading && !isError && entregadores && entregadores.length > 0 && (
-        <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-          <MapaFrota
-            entregadores={entregadores}
-            coordenadaLoja={null}
-            agora={agora}
-          />
-          <div className="flex flex-col gap-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+          <LimiteDeErro mensagem="Não foi possível exibir o mapa. Os entregadores continuam na lista.">
+            <MapaFrota
+              entregadores={entregadores}
+              coordenadaLoja={loja.data?.coordenada ?? null}
+              agora={agora}
+            />
+          </LimiteDeErro>
+          <div className="flex flex-col gap-3">
             <h2 className="text-lg font-medium">
               Entregadores ({entregadores.length})
             </h2>

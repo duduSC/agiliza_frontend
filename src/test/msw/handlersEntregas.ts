@@ -1,7 +1,6 @@
 /**
- * Handlers MSW dos endpoints de entrega (T003). Todos PROVISORIOS (AGENT.md 6.7).
+ * Handlers MSW dos endpoints de entrega (S007), com os status do backend (422 nas regras).
  *
- * Casos de sucesso, erro 400 com `campos[]`, 404, 409 (transicao invalida).
  * O "banco" em memoria (`dadosEntregas.ts`) permite que os testes manipulem o
  * estado para verificar comportamentos especificos.
  */
@@ -10,31 +9,11 @@ import { ENDPOINTS } from '@/shared/api/endpoints'
 import type { EntregaResponse } from '@/shared/api/schemas'
 import { criarEntregaResponse } from '@/test/fabricas'
 import { dbEntregas } from './dadosEntregas'
-
-function erroApi(
-  status: number,
-  codigo: string,
-  message: string,
-  campos?: { campo: string; mensagem: string }[],
-) {
-  return HttpResponse.json(
-    {
-      timestamp: new Date().toISOString(),
-      status,
-      error: status === 400 ? 'Bad Request' : status === 404 ? 'Not Found' : 'Conflict',
-      codigo,
-      message,
-      path: '/api/entregas',
-      campos: campos ?? [],
-    },
-    { status },
-  )
-}
+import { erroApi, naoEncontrado, regraViolada } from './respostas'
 
 export const handlersEntregas = [
   /**
    * GET /api/entregas — filtra por `status` e/ou `pendenteRevisao`.
-   * PROVISORIO: o backend ainda nao tem este controller.
    */
   http.get(`*${ENDPOINTS.entregas.listar}`, ({ request }) => {
     const url = new URL(request.url)
@@ -69,27 +48,27 @@ export const handlersEntregas = [
       campos.push({ campo: 'enderecoCompleto', mensagem: 'Endereco e obrigatorio.' })
     }
     if (campos.length > 0) {
-      return erroApi(400, 'DADOS_INVALIDOS', 'Ha campos com dados invalidos.', campos)
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'Um ou mais campos contêm valores inválidos.', campos)
     }
 
     const nova = criarEntregaResponse({
       id: crypto.randomUUID(),
       nomeCliente: corpo.nomeCliente as string,
       enderecoCompleto: corpo.enderecoCompleto as string,
-      bairro: (corpo.bairro as string | null) ?? undefined,
-      cep: (corpo.cep as string | null) ?? undefined,
-      complemento: (corpo.complemento as string | null) ?? undefined,
-      pontoReferencia: (corpo.pontoReferencia as string | null) ?? undefined,
-      telefoneCliente: (corpo.telefoneCliente as string | null) ?? undefined,
-      coordenada: corpo.coordenada as EntregaResponse['coordenada'],
-      valorPedido: corpo.valorPedido as number | undefined,
-      formaPagamento: corpo.formaPagamento as EntregaResponse['formaPagamento'],
-      pagoOnline: corpo.pagoOnline as boolean,
-      trocoPara: corpo.trocoPara as number | undefined,
-      observacoes: (corpo.observacoes as string | null) ?? undefined,
+      bairro: (corpo.bairro as string | null) ?? null,
+      cep: (corpo.cep as string | null) ?? null,
+      complemento: (corpo.complemento as string | null) ?? null,
+      pontoReferencia: (corpo.pontoReferencia as string | null) ?? null,
+      telefoneCliente: (corpo.telefoneCliente as string | null) ?? null,
+      coordenada: (corpo.coordenada as EntregaResponse['coordenada']) ?? null,
+      valorPedido: (corpo.valorPedido as number | null) ?? null,
+      formaPagamento: (corpo.formaPagamento as EntregaResponse['formaPagamento']) ?? null,
+      pagoOnline: corpo.pagoOnline === true,
+      trocoPara: (corpo.trocoPara as number | null) ?? null,
+      observacoes: (corpo.observacoes as string | null) ?? null,
       status: 'AGUARDANDO_DESPACHO',
       pendenteRevisao: corpo.coordenada == null,
-      motivoRevisao: corpo.coordenada == null ? 'SEM_COORDENADA' : undefined,
+      motivoRevisao: corpo.coordenada == null ? 'SEM_COORDENADA' : null,
     })
 
     dbEntregas.inserir(nova)
@@ -97,14 +76,14 @@ export const handlersEntregas = [
   }),
 
   /** POST /api/entregas/:id/pronto — marcar como pronto para despacho. */
-  http.post('*/api/entregas/:id/pronto', ({ params }) => {
+  http.post('*/api/entregas/:id/pronto', ({ params, request }) => {
     const id = params.id as string
     const entrega = dbEntregas.buscar(id)
     if (!entrega) {
-      return erroApi(404, 'ENTREGA_NAO_ENCONTRADA', 'Entrega nao encontrada.')
+      return naoEncontrado(request)
     }
     if (entrega.status !== 'AGUARDANDO_DESPACHO') {
-      return erroApi(409, 'TRANSICAO_ESTADO_INVALIDA', 'Esta acao nao e permitida no status atual.')
+      return regraViolada(request, 'TRANSICAO_ESTADO_INVALIDA', 'Transição de estado inválida.')
     }
     const atualizada = dbEntregas.atualizar(id, {
       prontoParaDespachoEm: '2026-11-11T12:00:00',
@@ -118,17 +97,17 @@ export const handlersEntregas = [
     const id = params.id as string
     const entrega = dbEntregas.buscar(id)
     if (!entrega) {
-      return erroApi(404, 'ENTREGA_NAO_ENCONTRADA', 'Entrega nao encontrada.')
+      return naoEncontrado(request)
     }
 
     const statusPermitidos = ['AGUARDANDO_DESPACHO', 'DESPACHADA', 'EM_ROTA']
     if (!statusPermitidos.includes(entrega.status)) {
-      return erroApi(409, 'TRANSICAO_ESTADO_INVALIDA', 'Esta acao nao e permitida no status atual.')
+      return regraViolada(request, 'TRANSICAO_ESTADO_INVALIDA', 'Transição de estado inválida.')
     }
 
     const corpo = (await request.json()) as Record<string, unknown>
     if (!corpo.motivo || (corpo.motivo as string).trim() === '') {
-      return erroApi(400, 'DADOS_INVALIDOS', 'O motivo do cancelamento e obrigatorio.', [
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'O motivo do cancelamento é obrigatório.', [
         { campo: 'motivo', mensagem: 'O motivo do cancelamento e obrigatorio.' },
       ])
     }
@@ -147,7 +126,7 @@ export const handlersEntregas = [
     const id = params.id as string
     const entrega = dbEntregas.buscar(id)
     if (!entrega) {
-      return erroApi(404, 'ENTREGA_NAO_ENCONTRADA', 'Entrega nao encontrada.')
+      return naoEncontrado(request)
     }
 
     const corpo = (await request.json()) as Record<string, unknown>
@@ -155,7 +134,7 @@ export const handlersEntregas = [
     const longitude = corpo.longitude as number
 
     if (latitude == null || longitude == null) {
-      return erroApi(400, 'DADOS_INVALIDOS', 'Coordenada invalida.', [
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'Coordenada inválida.', [
         { campo: 'latitude', mensagem: 'Informe a latitude.' },
         { campo: 'longitude', mensagem: 'Informe a longitude.' },
       ])
@@ -164,7 +143,7 @@ export const handlersEntregas = [
     const atualizada = dbEntregas.atualizar(id, {
       coordenada: { latitude, longitude },
       pendenteRevisao: false,
-      motivoRevisao: undefined,
+      motivoRevisao: null,
       distanciaKm: 3.5, // Valor de exemplo — recalculado pelo backend
       valorRepasse: 9.5, // Valor de exemplo — recalculado pelo backend
       atualizadoEm: '2026-11-11T12:10:00',

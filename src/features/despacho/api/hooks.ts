@@ -10,7 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSessaoStore } from '@/features/auth'
 import type { AjustarCoordenadaRequest, CriarEntregaAvulsaRequest } from '@/shared/api'
-import { obterEstadoConexao } from '@/shared/realtime'
+import { usePollingDeReserva } from '@/shared/realtime'
 import {
   ajustarCoordenada,
   cancelarEntrega,
@@ -22,13 +22,6 @@ import {
 import { contarFalhasPendentes } from './falhasApi'
 import { despacharLote, devolverLote, listarLotesDespachados, type DespacharLoteRequest } from './lotesApi'
 import { listarEntregadoresDisponiveis } from './motoboysApi'
-
-export const INTERVALO_POLLING_MS = 15_000
-
-/** Polling ativo apenas quando STOMP desconectado. */
-function intervaloPolling(): number | false {
-  return obterEstadoConexao() === 'conectado' ? false : INTERVALO_POLLING_MS
-}
 
 export const chavesEntregas = {
   todas: (estabelecimentoId: string | null) => ['entregas', estabelecimentoId] as const,
@@ -59,42 +52,46 @@ function useEstabelecimentoDaSessao(): string | null {
 }
 
 export function useEntregasPendentes() {
+  const refetchInterval = usePollingDeReserva()
   const estabelecimentoId = useEstabelecimentoDaSessao()
   return useQuery({
     queryKey: chavesEntregas.pendentes(estabelecimentoId),
     queryFn: ({ signal }) => listarPendentesDeDespacho(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: intervaloPolling,
+    refetchInterval,
   })
 }
 
 export function useEntregasEmRevisao() {
+  const refetchInterval = usePollingDeReserva()
   const estabelecimentoId = useEstabelecimentoDaSessao()
   return useQuery({
     queryKey: chavesEntregas.revisao(estabelecimentoId),
     queryFn: ({ signal }) => listarEmRevisao(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: intervaloPolling,
+    refetchInterval,
   })
 }
 
 export function useLotesDespachados() {
+  const refetchInterval = usePollingDeReserva()
   const estabelecimentoId = useEstabelecimentoDaSessao()
   return useQuery({
     queryKey: chavesLotes.despachados(estabelecimentoId),
     queryFn: ({ signal }) => listarLotesDespachados(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: intervaloPolling,
+    refetchInterval,
   })
 }
 
 export function useEntregadoresDisponiveis() {
+  const refetchInterval = usePollingDeReserva()
   const estabelecimentoId = useEstabelecimentoDaSessao()
   return useQuery({
     queryKey: chavesMotoboys.disponiveis(estabelecimentoId),
     queryFn: ({ signal }) => listarEntregadoresDisponiveis(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: intervaloPolling,
+    refetchInterval,
   })
 }
 
@@ -111,10 +108,14 @@ export function useFalhasPendentes() {
 function useInvalidarDespacho() {
   const queryClient = useQueryClient()
   const estabelecimentoId = useEstabelecimentoDaSessao()
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: chavesEntregas.todas(estabelecimentoId) })
-    void queryClient.invalidateQueries({ queryKey: chavesLotes.todas(estabelecimentoId) })
-    void queryClient.invalidateQueries({ queryKey: chavesMotoboys.todas(estabelecimentoId) })
+  // Roda no sucesso E no erro (recusa costuma significar que o estado mudou por baixo). A mutacao
+  // so termina com as listas recarregadas, entao o botao nao reabre sobre dado velho.
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: chavesEntregas.todas(estabelecimentoId) }),
+      queryClient.invalidateQueries({ queryKey: chavesLotes.todas(estabelecimentoId) }),
+      queryClient.invalidateQueries({ queryKey: chavesMotoboys.todas(estabelecimentoId) }),
+    ])
   }
 }
 
@@ -122,7 +123,7 @@ export function useCriarEntregaAvulsa() {
   const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (corpo: CriarEntregaAvulsaRequest) => criarEntregaAvulsa(corpo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -130,7 +131,7 @@ export function useMarcarPronto() {
   const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (id: string) => marcarPronto(id),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -138,7 +139,7 @@ export function useCancelarEntrega() {
   const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: ({ id, motivo }: { id: string; motivo: string }) => cancelarEntrega(id, motivo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -147,7 +148,7 @@ export function useAjustarCoordenada() {
   return useMutation({
     mutationFn: ({ id, coordenada }: { id: string; coordenada: AjustarCoordenadaRequest }) =>
       ajustarCoordenada(id, coordenada),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -155,7 +156,7 @@ export function useDespacharLote() {
   const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (corpo: DespacharLoteRequest) => despacharLote(corpo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -163,6 +164,6 @@ export function useDevolverLote() {
   const invalidar = useInvalidarDespacho()
   return useMutation({
     mutationFn: (id: string) => devolverLote(id),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }

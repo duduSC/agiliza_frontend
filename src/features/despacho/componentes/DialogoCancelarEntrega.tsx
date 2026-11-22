@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/dialog'
+import { ehErroApi } from '@/shared/api'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useCancelarEntrega } from '../api/hooks'
 import { cancelamentoFormSchema, type CancelamentoForm } from '../formularios'
 import { mensagemDoErro } from '../util'
@@ -51,23 +53,28 @@ function DialogoCancelarEntrega({
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<CancelamentoForm>({
     resolver: zodResolver(cancelamentoFormSchema),
     defaultValues: { motivo: '' },
   })
 
-  const enviar = handleSubmit(async ({ motivo }) => {
-    if (cancelar.isPending) return
-    setErroServidor(null)
-    try {
-      await cancelar.mutateAsync({ id: entrega.id, motivo })
-      toast.success(`Entrega de ${entrega.nomeCliente} cancelada.`)
-      aoFechar()
-    } catch (erro) {
-      setErroServidor(mensagemDoErro(erro))
-    }
-  })
+  const envioUnico = useEnvioUnico()
+  const enviar = handleSubmit(({ motivo }) =>
+    envioUnico(async () => {
+      setErroServidor(null)
+      try {
+        await cancelar.mutateAsync({ id: entrega.id, motivo })
+        toast.success(`Entrega de ${entrega.nomeCliente} cancelada.`)
+        aoFechar()
+      } catch (erro) {
+        const doMotivo = ehErroApi(erro) && erro.campos.find((c) => c.campo === 'motivo')
+        if (doMotivo) setError('motivo', { message: doMotivo.mensagem })
+        setErroServidor(mensagemDoErro(erro))
+      }
+    }),
+  )
 
   return (
     <Dialog

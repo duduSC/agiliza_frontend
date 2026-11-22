@@ -11,6 +11,7 @@ type EstadoSelecao = {
   maxPedidosPorLote: number
   alternarSelecao: (id: string) => boolean
   limparSelecao: () => void
+  manterApenas: (ids: readonly string[]) => void
   definirLimite: (max: number) => void
   estaSelecionada: (id: string) => boolean
   limiteAtingido: () => boolean
@@ -38,6 +39,14 @@ export const useSelecaoStore = create<EstadoSelecao>()((set, get) => ({
   },
 
   limparSelecao: () => set({ selecionadas: new Set<string>() }),
+
+  // Preserva a ordem de selecao, que vira a ordem das paradas no lote.
+  manterApenas: (ids: readonly string[]) => {
+    const { selecionadas } = get()
+    const visiveis = new Set(ids)
+    const nova = [...selecionadas].filter((id) => visiveis.has(id))
+    if (nova.length !== selecionadas.size) set({ selecionadas: new Set(nova) })
+  },
 
   definirLimite: (max: number) => set({ maxPedidosPorLote: max }),
 

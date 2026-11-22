@@ -7,9 +7,12 @@ export function criarQueryClient(): QueryClient {
       queries: {
         staleTime: 15_000,
         refetchOnWindowFocus: false,
-        // Não repete 4xx (regra de negócio, auth, validação): só falha de rede/5xx.
+        // Não repete 4xx (regra de negócio, auth, validação) nem resposta fora do schema: só rede/5xx.
         retry: (tentativas, erro) => {
-          if (ehErroApi(erro) && erro.status >= 400 && erro.status < 500) return false
+          if (ehErroApi(erro)) {
+            if (erro.tipo === 'resposta_invalida') return false
+            if (erro.status >= 400 && erro.status < 500) return false
+          }
           return tentativas < 2
         },
       },

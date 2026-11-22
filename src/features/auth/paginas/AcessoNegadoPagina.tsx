@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
-import { primeiraTelaDoPerfil } from '@/shared/dominio'
+import { CAMINHO_INICIO, perfilAcessaBackoffice } from '@/shared/dominio'
 import { useSessaoStore } from '../sessaoStore'
 
 /** Rota sem permissão ou resposta 403 da API (Constituição, Artigo 6.3). */
 export function AcessoNegadoPagina() {
   const perfil = useSessaoStore((s) => s.usuario?.perfil)
-  const inicio = perfil ? primeiraTelaDoPerfil(perfil) : null
+  const inicio = perfil && perfilAcessaBackoffice(perfil) ? CAMINHO_INICIO : null
 
   return (
     <section className="flex flex-col items-start gap-3" aria-labelledby="titulo-acesso-negado">

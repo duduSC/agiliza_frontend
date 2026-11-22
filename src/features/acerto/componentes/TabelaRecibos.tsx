@@ -7,6 +7,7 @@ import { LABEL_STATUS_RECIBO } from '@/shared/dominio'
 import { formatarMoeda, formatarDataHora, formatarData } from '@/shared/formatacao'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
+import type { SituacaoCaixa } from '../regras'
 import {
   Table,
   TableBody,
@@ -19,8 +20,9 @@ import {
 type Props = {
   recibos: ReciboResponse[]
   aoMarcarPago: (id: string) => void
-  marcandoPago: boolean
-  caixaFechado: boolean
+  /** Recibo com pagamento em envio; trava os demais. */
+  pagandoId: string | null
+  caixaDe: (recibo: ReciboResponse) => SituacaoCaixa
 }
 
 function badgeStatus(status: ReciboResponse['status']) {
@@ -34,7 +36,7 @@ function badgeStatus(status: ReciboResponse['status']) {
   }
 }
 
-export function TabelaRecibos({ recibos, aoMarcarPago, marcandoPago, caixaFechado }: Props) {
+export function TabelaRecibos({ recibos, aoMarcarPago, pagandoId, caixaDe }: Props) {
   if (recibos.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-muted-foreground">
@@ -49,37 +51,37 @@ export function TabelaRecibos({ recibos, aoMarcarPago, marcandoPago, caixaFechad
         <TableHeader>
           <TableRow>
             <TableHead>Data</TableHead>
-            <TableHead>Periodo</TableHead>
+            <TableHead>Período</TableHead>
             <TableHead className="text-right">Entregas</TableHead>
             <TableHead className="text-right">Total</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Pago em</TableHead>
-            <TableHead>Acoes</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {recibos.map((r) => (
             <TableRow key={r.id}>
               <TableCell>{formatarData(r.dataReferencia)}</TableCell>
-              <TableCell>
-                {formatarDataHora(r.periodoInicio)} - {formatarDataHora(r.periodoFim)}
+              <TableCell className="whitespace-normal">
+                {formatarDataHora(r.periodoInicio)} a {formatarDataHora(r.periodoFim)}
               </TableCell>
               <TableCell className="text-right">{r.qtdEntregas}</TableCell>
               <TableCell className="text-right">{formatarMoeda(r.valorTotal)}</TableCell>
               <TableCell>{badgeStatus(r.status)}</TableCell>
               <TableCell>{formatarDataHora(r.pagoEm)}</TableCell>
               <TableCell>
-                {r.status === 'GERADO' && !caixaFechado && (
+                {r.status === 'GERADO' && caixaDe(r) === 'ABERTO' && (
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => aoMarcarPago(r.id)}
-                    disabled={marcandoPago}
+                    disabled={pagandoId !== null}
                   >
-                    {marcandoPago ? 'Pagando...' : 'Marcar pago'}
+                    {pagandoId === r.id ? 'Pagando…' : 'Marcar pago'}
                   </Button>
                 )}
-                {r.status === 'GERADO' && caixaFechado && (
+                {r.status === 'GERADO' && caixaDe(r) === 'FECHADO' && (
                   <span className="text-xs text-muted-foreground">
                     Caixa fechado
                   </span>

@@ -1,6 +1,6 @@
 /**
  * Normalização de `ApiErrorResponse` (AGENT.md 6.5; backend
- * `exception/handler/ApiErrorResponse.java` e `CodigoErro.java`, conferidos em 10/11/2026).
+ * `exception/handler/ApiErrorResponse.java` e `CodigoErro.java`, conferidos em 22/11/2026, develop 8c02b47).
  */
 import { z } from 'zod'
 
@@ -103,8 +103,9 @@ export const apiErrorResponseSchema = z.object({
   codigo: z.string().optional(),
   message: z.string().optional(),
   path: z.string().optional(),
-  campos: z.array(z.object({ campo: z.string(), mensagem: z.string() })).optional(),
+  campos: z.array(z.unknown()).optional(),
 })
+const campoErroSchema = z.object({ campo: z.string(), mensagem: z.string() })
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>
 
 export type CampoErroApi = { campo: string; mensagem: string }
@@ -158,10 +159,34 @@ function mensagemPorStatus(status: number): string {
   return 'Não foi possível concluir a operação.'
 }
 
+const REGEX_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+/**
+ * Casos em que só a `message` do servidor explica o que houve (S005, S013): regra de negócio
+ * genérica, ajuste recusado, espera por operação simultânea, banco indisponível e dado inválido
+ * sem campo. As demais trazem nomes internos e ficam com o texto do catálogo.
+ */
+function servidorExplicaMelhor(
+  codigo: CodigoErro,
+  status: number,
+  message: string,
+  temCampos: boolean,
+): boolean {
+  if (REGEX_UUID.test(message)) return false
+  return (
+    codigo === 'REGRA_NEGOCIO_VIOLADA' ||
+    codigo === 'AJUSTE_VALOR_NAO_PERMITIDO' ||
+    codigo === 'DADO_DUPLICADO' ||
+    (codigo === 'DADOS_INVALIDOS' && !temCampos) ||
+    status === 503
+  )
+}
+
 /**
  * Converte o corpo de erro (já lido como JSON, ou `null` se não for JSON) num `ErroApi`.
- * Regra de mensagem: código conhecido → mapa pt-BR; código desconhecido ou ausente →
- * `message` do servidor; sem `message` → mensagem genérica pelo status HTTP.
+ * Regra de mensagem: código conhecido → mapa pt-BR (ou a `message`, ver acima); código
+ * desconhecido → `message` do servidor; sem `codigo` (erro padrão do Spring, proxy) → mensagem
+ * genérica pelo status HTTP, porque o texto desses erros é técnico e em inglês.
  */
 export function parseErroApi(status: number, corpo: unknown): ErroApi {
   const resultado = apiErrorResponseSchema.safeParse(corpo)
@@ -170,8 +195,20 @@ export function parseErroApi(status: number, corpo: unknown): ErroApi {
   const codigo = codigoBruto !== null && ehCodigoErro(codigoBruto) ? codigoBruto : null
   const mensagemServidor = dados.message?.trim() ? dados.message : null
 
-  const mensagem =
-    codigo !== null ? MENSAGENS_ERRO[codigo] : (mensagemServidor ?? mensagemPorStatus(status))
+  const campos = (dados.campos ?? []).flatMap((item) => {
+    const campo = campoErroSchema.safeParse(item)
+    return campo.success ? [campo.data] : []
+  })
+
+  let mensagem = mensagemPorStatus(status)
+  if (codigo !== null) {
+    mensagem =
+      mensagemServidor && servidorExplicaMelhor(codigo, status, mensagemServidor, campos.length > 0)
+        ? mensagemServidor
+        : MENSAGENS_ERRO[codigo]
+  } else if (codigoBruto !== null && mensagemServidor) {
+    mensagem = mensagemServidor
+  }
 
   return new ErroApi({
     tipo: 'http',
@@ -180,7 +217,7 @@ export function parseErroApi(status: number, corpo: unknown): ErroApi {
     codigoBruto,
     mensagem,
     mensagemServidor,
-    campos: dados.campos ?? [],
+    campos,
     path: dados.path ?? null,
   })
 }
@@ -192,6 +229,22 @@ export function erroDeRede(): ErroApi {
     codigo: null,
     codigoBruto: null,
     mensagem: 'Não foi possível conectar ao servidor. Verifique sua conexão.',
+    mensagemServidor: null,
+    campos: [],
+    path: null,
+  })
+}
+
+export function erroDeTempoEsgotado(escrita: boolean): ErroApi {
+  return new ErroApi({
+    tipo: 'rede',
+    status: 0,
+    codigo: null,
+    codigoBruto: null,
+    // Uma escrita pode ter sido gravada mesmo sem resposta: repetir às cegas duplicaria.
+    mensagem: escrita
+      ? 'O servidor demorou para responder. Confira se a ação foi registrada antes de repetir.'
+      : 'O servidor demorou para responder. Tente novamente.',
     mensagemServidor: null,
     campos: [],
     path: null,

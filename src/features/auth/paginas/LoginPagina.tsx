@@ -16,11 +16,12 @@ import type { EstadoIdaAoLogin } from '../componentes/guardas'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { fazerLogin } from '../api/authApi'
 import { useSessaoStore, MENSAGEM_PERFIL_SEM_ACESSO } from '../sessaoStore'
 
 const loginSchema = z.object({
-  loginEmail: z.string().email('Informe um e-mail valido.'),
+  loginEmail: z.string().email('Informe um e-mail válido.'),
   senha: z.string().min(1, 'Informe a senha.'),
 })
 
@@ -35,6 +36,7 @@ export function LoginPagina() {
   const [erro, setErro] = useState<string | null>(null)
   const [errosCampo, setErrosCampo] = useState<{ email?: string; senha?: string }>({})
   const [enviando, setEnviando] = useState(false)
+  const envioUnico = useEnvioUnico()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -53,6 +55,10 @@ export function LoginPagina() {
       return
     }
 
+    await envioUnico(entrar)
+  }
+
+  async function entrar() {
     setEnviando(true)
     try {
       const resposta = await fazerLogin({ loginEmail: email, senha })
@@ -85,14 +91,18 @@ export function LoginPagina() {
             setErro(MENSAGENS_ERRO.USUARIO_BLOQUEADO)
             break
           case 'ACESSO_NEGADO':
-            // Canal errado (improvavel no backoffice, mas tratar)
+            // Caminho real do entregador: o backend recusa o canal com 403 (UC07 E4)
             setErro(MENSAGEM_PERFIL_SEM_ACESSO)
             break
-          default:
-            setErro(err.mensagem)
+          default: {
+            const doEmail = err.campos.find((c) => c.campo === 'loginEmail')?.mensagem
+            const daSenha = err.campos.find((c) => c.campo === 'senha')?.mensagem
+            if (doEmail || daSenha) setErrosCampo({ email: doEmail, senha: daSenha })
+            else setErro(err.mensagem)
+          }
         }
       } else {
-        setErro('Erro de conexao. Verifique sua internet e tente novamente.')
+        setErro('Não foi possível entrar. Tente novamente.')
       }
     } finally {
       setEnviando(false)
