@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { cleanup, configure } from '@testing-library/react'
+import { toast } from 'sonner'
 import { vi } from 'vitest'
 import { mapaFalso } from './mapaFalso'
 import { redefinirAcerto } from './msw/dadosAcerto'
@@ -95,6 +96,9 @@ beforeAll(() => {
 })
 afterEach(() => {
   cleanup()
+  // O Sonner reapresenta os avisos ativos a cada Toaster novo: sem isto, um teste passava pelo
+  // aviso do anterior e deixava a requisição dele solta para o seguinte.
+  toast.dismiss()
   server.resetHandlers()
   redefinirAcerto()
   redefinirEntregas()
