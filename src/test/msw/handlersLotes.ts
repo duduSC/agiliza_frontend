@@ -1,141 +1,130 @@
 /**
- * Handlers MSW dos endpoints de lotes e motoboys (T004). PROVISORIOS.
+ * Handlers MSW de lotes, entregadores e falhas (S008, S010), com as regras do
+ * `LoteEntregaServiceImpl`: despacho põe o entregador EM_ROTA; devolução traz tudo de volta.
  */
 import { http, HttpResponse } from 'msw'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import type { LoteEntregaResponse } from '@/shared/api/schemas'
+import { criarLoteResponse } from '@/test/fabricas'
+import { somarNoServidor } from './dadosAcerto'
+import { dbEntregas } from './dadosEntregas'
 import { dbLotes } from './dadosLotes'
 import { dbMotoboys } from './dadosMotoboys'
-import { dbEntregas } from './dadosEntregas'
+import { criarEstabelecimentoMock } from './handlersEstabelecimento'
+import { erroApi, naoEncontrado, regraViolada } from './respostas'
 
-function erroApi(
-  status: number,
-  codigo: string,
-  message: string,
-  campos?: { campo: string; mensagem: string }[],
-) {
-  return HttpResponse.json(
-    {
-      timestamp: new Date().toISOString(),
-      status,
-      error: status === 400 ? 'Bad Request' : status === 404 ? 'Not Found' : 'Conflict',
-      codigo,
-      message,
-      path: '/api/lotes',
-      campos: campos ?? [],
-    },
-    { status },
-  )
-}
+const CONFIGURACAO_INTEGRACAO = 'c0000000-0000-4000-8000-000000000001'
+
+const FALHAS = [
+  {
+    id: 1,
+    configuracaoIntegracaoId: CONFIGURACAO_INTEGRACAO,
+    idExterno: 'SIM-0001',
+    etapa: 'GEOCODIFICACAO',
+    tentativas: 5,
+    status: 'PENDENTE',
+    ocorridoEm: '2026-11-11T10:30:00.123456',
+    resolvidoEm: null,
+  },
+  {
+    id: 2,
+    configuracaoIntegracaoId: CONFIGURACAO_INTEGRACAO,
+    idExterno: null,
+    etapa: 'CONSULTA',
+    tentativas: 5,
+    status: 'PENDENTE',
+    ocorridoEm: '2026-11-11T11:00:00.123456',
+    resolvidoEm: null,
+  },
+]
 
 export const handlersLotes = [
-  /** GET /api/lotes — filtra por status. PROVISORIO. */
   http.get(`*${ENDPOINTS.lotes.listar}`, ({ request }) => {
-    const url = new URL(request.url)
-    const statusParam = url.searchParams.get('status')
-    let resultado = dbLotes.todos()
-    if (statusParam) {
-      resultado = resultado.filter((l) => l.status === statusParam)
-    }
-    return HttpResponse.json(resultado)
+    const status = new URL(request.url).searchParams.get('status') ?? 'DESPACHADO'
+    return HttpResponse.json(dbLotes.todos().filter((l) => l.status === status))
   }),
 
-  /** GET /api/motoboys — filtra por statusDisponibilidade. PROVISORIO. */
+  // Como o controller: statusCadastro tem precedência sobre statusDisponibilidade.
   http.get(`*${ENDPOINTS.motoboys.listar}`, ({ request }) => {
-    const url = new URL(request.url)
-    const statusParam = url.searchParams.get('statusDisponibilidade')
-    let resultado = dbMotoboys.todos()
-    if (statusParam) {
-      resultado = resultado.filter((m) => m.statusDisponibilidade === statusParam)
-    }
-    return HttpResponse.json(resultado)
+    const p = new URL(request.url).searchParams
+    const cadastro = p.get('statusCadastro')
+    const disponibilidade = p.get('statusDisponibilidade')
+    return HttpResponse.json(
+      dbMotoboys.todos().filter((m) => {
+        if (cadastro) return m.statusCadastro === cadastro
+        return !disponibilidade || m.statusDisponibilidade === disponibilidade
+      }),
+    )
   }),
 
-  /** POST /api/lotes — despachar lote. PROVISORIO. */
   http.post(`*${ENDPOINTS.lotes.despachar}`, async ({ request }) => {
-    const corpo = (await request.json()) as Record<string, unknown>
-    const motoboyId = corpo.motoboyId as string
-    const entregaIds = corpo.entregaIds as string[]
-
-    if (!motoboyId || !entregaIds || entregaIds.length === 0) {
-      return erroApi(400, 'DADOS_INVALIDOS', 'motoboyId e entregaIds sao obrigatorios.')
+    const { motoboyId, entregaIds } = (await request.json()) as { motoboyId?: string; entregaIds?: string[] }
+    if (!motoboyId || !entregaIds?.length) {
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'Um ou mais campos contêm valores inválidos.', [
+        { campo: 'entregaIds', mensagem: 'não deve estar vazio' },
+      ])
+    }
+    if (entregaIds.length > criarEstabelecimentoMock().maxPedidosPorLote) {
+      return regraViolada(request, 'LIMITE_LOTE_EXCEDIDO', 'Limite de entregas por lote excedido.')
+    }
+    const motoboy = dbMotoboys.buscar(motoboyId)
+    if (!motoboy) return naoEncontrado(request)
+    if (motoboy.statusDisponibilidade !== 'ONLINE' || motoboy.statusCadastro !== 'ATIVO') {
+      return regraViolada(request, 'MOTOBOY_INDISPONIVEL', 'O entregador não está disponível.')
+    }
+    const entregas = []
+    for (const id of entregaIds) {
+      const entrega = dbEntregas.buscar(id)
+      if (!entrega) return naoEncontrado(request)
+      if (entrega.status !== 'AGUARDANDO_DESPACHO' || entrega.pendenteRevisao) {
+        return regraViolada(request, 'ENTREGA_INAPTA_LOTE', 'A entrega não pode ser incluída no lote.')
+      }
+      entregas.push(entrega)
     }
 
-    // Verificar se o motoboy esta disponivel
-    const motoboy = dbMotoboys.todos().find((m) => m.id === motoboyId)
-    if (!motoboy || motoboy.statusDisponibilidade !== 'ONLINE' || motoboy.statusCadastro !== 'ATIVO') {
-      return erroApi(422, 'MOTOBOY_INDISPONIVEL', 'O entregador nao esta disponivel.')
-    }
-
-    // Verificar limite
-    if (entregaIds.length > 5) {
-      return erroApi(422, 'LIMITE_LOTE_EXCEDIDO', 'Limite de entregas por lote excedido.')
-    }
-
-    const novoLote: LoteEntregaResponse = {
+    const agora = '2026-11-11T12:00:00.123456'
+    const lote = criarLoteResponse({
       id: crypto.randomUUID(),
-      estabelecimentoId: '6f1c2a3b-4d5e-4f60-8a71-0b2c3d4e5f60',
       motoboyId,
-      usuarioDespachanteId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-      status: 'DESPACHADO',
-      qtdEntregas: entregaIds.length,
-      despachadoEm: '2026-11-11T12:00:00',
-      criadoEm: '2026-11-11T12:00:00',
-    }
-
-    dbLotes.inserir(novoLote)
-
-    // Atualizar status das entregas
-    for (const eid of entregaIds) {
-      dbEntregas.atualizar(eid, {
+      qtdEntregas: entregas.length,
+      valorTotalRepasse: somarNoServidor(entregas.map((e) => e.valorRepasse)),
+      despachadoEm: agora,
+    })
+    dbLotes.inserir(lote)
+    entregas.forEach((e, i) =>
+      dbEntregas.atualizar(e.id, {
         status: 'DESPACHADA',
-        loteId: novoLote.id,
-        despachadaEm: '2026-11-11T12:00:00',
-        atualizadoEm: '2026-11-11T12:00:00',
+        loteId: lote.id,
+        ordemRota: i + 1,
+        despachadaEm: agora,
+      }),
+    )
+    dbMotoboys.atualizar(motoboyId, { statusDisponibilidade: 'EM_ROTA' })
+    return HttpResponse.json(lote, { status: 201 })
+  }),
+
+  http.post('*/api/lotes/:id/devolver', ({ params, request }) => {
+    const lote = dbLotes.buscar(params.id as string)
+    if (!lote) return naoEncontrado(request)
+    if (lote.status !== 'DESPACHADO') {
+      return regraViolada(request, 'TRANSICAO_ESTADO_INVALIDA', 'Transição de estado inválida para Lote.')
+    }
+    for (const e of dbEntregas.todas()) {
+      if (e.loteId !== lote.id || e.status !== 'DESPACHADA') continue
+      dbEntregas.atualizar(e.id, {
+        status: 'AGUARDANDO_DESPACHO',
+        loteId: null,
+        ordemRota: null,
+        despachadaEm: null,
       })
     }
-
-    return HttpResponse.json(novoLote, { status: 201 })
+    if (dbMotoboys.buscar(lote.motoboyId)?.statusDisponibilidade === 'EM_ROTA') {
+      dbMotoboys.atualizar(lote.motoboyId, { statusDisponibilidade: 'ONLINE' })
+    }
+    return HttpResponse.json(dbLotes.atualizar(lote.id, { status: 'CANCELADO' }))
   }),
 
-  /** POST /api/lotes/:id/devolver — devolver lote. PROVISORIO. */
-  http.post('*/api/lotes/:id/devolver', ({ params }) => {
-    const id = params.id as string
-    const lote = dbLotes.buscar(id)
-    if (!lote) {
-      return erroApi(404, 'LOTE_NAO_ENCONTRADO', 'Lote nao encontrado.')
-    }
-    if (lote.status !== 'DESPACHADO') {
-      return erroApi(422, 'TRANSICAO_ESTADO_INVALIDA', 'So lotes DESPACHADO podem ser devolvidos.')
-    }
-
-    const atualizado = dbLotes.atualizar(id, {
-      status: 'CANCELADO',
-      atualizadoEm: '2026-11-11T12:15:00',
-    })
-    return HttpResponse.json(atualizado)
-  }),
-
-  /** GET /api/falhas-integracao — contagem de falhas. PROVISORIO. */
-  http.get(`*${ENDPOINTS.integracoes.falhas}`, () => {
-    // Retornar duas falhas de exemplo
-    return HttpResponse.json([
-      {
-        id: 1,
-        configuracaoIntegracaoId: 'cfg-001',
-        etapa: 'GEOCODIFICACAO',
-        tentativas: 3,
-        status: 'PENDENTE',
-        ocorridoEm: '2026-11-11T10:30:00',
-      },
-      {
-        id: 2,
-        configuracaoIntegracaoId: 'cfg-001',
-        etapa: 'CONSULTA',
-        tentativas: 1,
-        status: 'PENDENTE',
-        ocorridoEm: '2026-11-11T11:00:00',
-      },
-    ])
+  http.get(`*${ENDPOINTS.integracoes.falhas}`, ({ request }) => {
+    const status = new URL(request.url).searchParams.get('status') ?? 'PENDENTE'
+    return HttpResponse.json(FALHAS.filter((f) => f.status === status))
   }),
 ]

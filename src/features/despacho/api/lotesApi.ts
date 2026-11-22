@@ -1,6 +1,6 @@
 /**
- * Chamadas de rede dos lotes (UC01 despacho e devolucao). PROVISORIOS
- * (`shared/api/endpoints.ts`) ate o backend publicar os controllers (T006).
+ * Chamadas de rede dos lotes (UC01 despacho e devolucao). Endpoints confirmados
+ * pelo backend (S008).
  */
 import { z } from 'zod'
 import { ENDPOINTS, requisitar } from '@/shared/api'

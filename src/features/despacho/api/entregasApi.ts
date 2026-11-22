@@ -1,6 +1,6 @@
 /**
- * Chamadas de rede das entregas do despacho (UC01). Todos os caminhos são PROVISÓRIOS
- * (`shared/api/endpoints.ts`) até o backend publicar os controllers.
+ * Chamadas de rede das entregas do despacho (UC01). Caminhos confirmados pelo
+ * backend (S007).
  */
 import {
   ENDPOINTS,
@@ -31,7 +31,7 @@ export async function listarPendentesDeDespacho(signal?: AbortSignal): Promise<E
   return entregas.filter((e) => e.status === 'AGUARDANDO_DESPACHO' && !e.pendenteRevisao)
 }
 
-/** Fila de revisão (`pendenteRevisao = true`). PROVISÓRIO: o backend ainda não tem este filtro. */
+/** Fila de revisão (`pendenteRevisao = true`). */
 export async function listarEmRevisao(signal?: AbortSignal): Promise<EntregaResponse[]> {
   const entregas = await requisitar({
     caminho: ENDPOINTS.entregas.listar,

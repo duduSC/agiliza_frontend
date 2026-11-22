@@ -1,211 +1,171 @@
 /**
- * Handlers MSW dos endpoints de acerto, recibos e caixa (T006).
- * Endpoints confirmados pelo backend (S009).
+ * Handlers MSW de acerto, recibos e caixa (S009), com as recusas do backend da develop 8c02b47
+ * (`PoliticaCorrecao`, `ReciboServiceImpl`, `CaixaServiceImpl`; S013).
  */
 import { http, HttpResponse } from 'msw'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import type { ReciboResponse } from '@/shared/api/schemas'
-import { IDS } from '@/test/fabricas'
-import { dbAcerto } from './dadosAcerto'
+import { criarAjusteResponse, criarCaixaResponse, criarReciboResponse } from '@/test/fabricas'
+import { dbAcerto, somarNoServidor } from './dadosAcerto'
+import { erroApi, naoEncontrado, regraViolada } from './respostas'
 
-function erroApi(
-  status: number,
-  codigo: string,
-  message: string,
-  campos?: { campo: string; mensagem: string }[],
-) {
-  return HttpResponse.json(
-    {
-      timestamp: new Date().toISOString(),
-      status,
-      error: status === 400 ? 'Bad Request' : status === 404 ? 'Not Found' : status === 409 ? 'Conflict' : 'Unprocessable Entity',
-      codigo,
-      message,
-      path: '/api',
-      campos: campos ?? [],
-    },
-    { status },
-  )
+const OPERADOR = 'b1b2c3d4-0003-4b00-8b00-00000000e003'
+let proximoAjuste = 100
+
+function caixaDoDia(dia: string) {
+  return dbAcerto.caixas().find((c) => c.dataReferencia === dia)
 }
 
 export const handlersAcerto = [
-  /** GET /api/acertos — extrato do acerto. Confirmado (S009). */
   http.get(`*${ENDPOINTS.acertos.extrato}`, ({ request }) => {
-    const url = new URL(request.url)
-    const motoboyId = url.searchParams.get('motoboyId')
-    if (!motoboyId) {
-      return erroApi(400, 'PARAMETRO_INVALIDO', 'motoboyId e obrigatorio.')
+    const p = new URL(request.url).searchParams
+    const motoboyId = p.get('motoboyId')
+    const inicio = p.get('inicio')
+    const fim = p.get('fim')
+    if (!motoboyId || !inicio || !fim) {
+      return erroApi(request, 400, 'PARAMETRO_INVALIDO', 'Parâmetro obrigatório não informado.')
     }
-    return HttpResponse.json(dbAcerto.extrato())
+    if (fim <= inicio) return regraViolada(request, 'REGRA_NEGOCIO_VIOLADA', 'O período informado é inválido.')
+    return HttpResponse.json(dbAcerto.extrato(motoboyId, inicio, fim))
   }),
 
-  /** GET /api/entregas/:id/ajustes — historico de ajustes. Confirmado (S009). */
-  http.get('*/api/entregas/:id/ajustes', ({ params }) => {
-    const id = params.id as string
-    return HttpResponse.json(dbAcerto.ajustes(id))
-  }),
+  http.get('*/api/entregas/:id/ajustes', ({ params }) =>
+    HttpResponse.json(dbAcerto.ajustes(params.id as string)),
+  ),
 
-  /** POST /api/entregas/:id/ajustes — ajustar repasse. Confirmado (S009). */
   http.post('*/api/entregas/:id/ajustes', async ({ params, request }) => {
-    const id = params.id as string
-    const corpo = (await request.json()) as Record<string, unknown>
-
-    // Verificar se a entrega tem recibo
-    const extrato = dbAcerto.extrato()
-    const linha = extrato.linhas.find((l) => l.entregaId === id)
-    if (linha && linha.reciboId) {
-      return erroApi(422, 'AJUSTE_VALOR_NAO_PERMITIDO', 'A entrega ja esta vinculada a um recibo.')
-    }
-
-    // Verificar caixa fechado
-    const caixa = dbAcerto.caixaAtual()
-    if (caixa && caixa.status === 'FECHADO') {
-      return erroApi(422, 'CAIXA_FECHADO', 'O caixa esta fechado.')
-    }
-
-    if (!corpo.motivo || (corpo.motivo as string).trim() === '') {
-      return erroApi(400, 'DADOS_INVALIDOS', 'O motivo e obrigatorio.', [
-        { campo: 'motivo', mensagem: 'O motivo e obrigatorio.' },
+    const entregaId = params.id as string
+    const corpo = (await request.json()) as { valorNovo: number; motivo?: string }
+    if (!corpo.motivo?.trim()) {
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'Um ou mais campos contêm valores inválidos.', [
+        { campo: 'motivo', mensagem: 'não deve estar em branco' },
       ])
     }
+    const entrega = dbAcerto.finalizada(entregaId)
+    if (!entrega) return naoEncontrado(request)
+    const recusar = (motivo: string) =>
+      regraViolada(request, 'AJUSTE_VALOR_NAO_PERMITIDO', `Ajuste manual de repasse não permitido: ${motivo}.`)
+    if (entrega.reciboId) return recusar(`a entrega está vinculada ao recibo '${entrega.reciboId}'`)
+    const caixa = caixaDoDia(entrega.finalizadaEm!.slice(0, 10))
+    if (!caixa) return recusar('não há caixa aberto para o dia da entrega')
+    if (caixa.status === 'FECHADO') return regraViolada(request, 'CAIXA_FECHADO', 'O caixa está fechado.')
+    if ((entrega.valorRepasse ?? 0) === corpo.valorNovo) return recusar('o novo valor é igual ao valor atual')
 
-    const ajuste = {
-      id: Date.now(),
-      entregaId: id,
-      usuarioId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-      valorAnterior: linha?.valorRepasse ?? 0,
-      valorNovo: corpo.valorNovo as number,
-      motivo: corpo.motivo as string,
-      ajustadoEm: '2026-11-09T17:30:00',
-    }
+    const ajuste = criarAjusteResponse({
+      id: ++proximoAjuste,
+      entregaId,
+      valorAnterior: entrega.valorRepasse ?? 0,
+      valorNovo: corpo.valorNovo,
+      motivo: corpo.motivo,
+      ajustadoEm: '2026-11-09T17:30:00.123456',
+    })
+    dbAcerto.atualizarFinalizada(entregaId, { valorRepasse: corpo.valorNovo })
     dbAcerto.inserirAjuste(ajuste)
-    return HttpResponse.json(ajuste)
+    return HttpResponse.json(ajuste, { status: 201 })
   }),
 
-  /** GET /api/recibos — listar recibos. Confirmado (S009). */
-  http.get(`*${ENDPOINTS.recibos.listar}`, () => {
-    return HttpResponse.json(dbAcerto.recibos())
+  http.get(`*${ENDPOINTS.recibos.listar}`, ({ request }) => {
+    const motoboyId = new URL(request.url).searchParams.get('motoboyId')
+    return HttpResponse.json(dbAcerto.recibos().filter((r) => !motoboyId || r.motoboyId === motoboyId))
   }),
 
-  /** POST /api/recibos — gerar recibo. Confirmado (S009). */
   http.post(`*${ENDPOINTS.recibos.gerar}`, async ({ request }) => {
-    const corpo = (await request.json()) as Record<string, unknown>
-    const motoboyId = corpo.motoboyId as string
+    const { motoboyId, periodoInicio, periodoFim } = (await request.json()) as Record<
+      'motoboyId' | 'periodoInicio' | 'periodoFim',
+      string
+    >
+    if (periodoFim <= periodoInicio) {
+      return regraViolada(request, 'REGRA_NEGOCIO_VIOLADA', 'O fim do período deve ser posterior ao início.')
+    }
+    const caixa = caixaDoDia(periodoInicio.slice(0, 10))
+    if (!caixa) return naoEncontrado(request)
+    if (caixa.status === 'FECHADO') return regraViolada(request, 'CAIXA_FECHADO', 'O caixa está fechado.')
 
-    // Verificar caixa fechado
-    const caixa = dbAcerto.caixaAtual()
-    if (caixa && caixa.status === 'FECHADO') {
-      return erroApi(422, 'CAIXA_FECHADO', 'O caixa esta fechado.')
+    const aptas = dbAcerto
+      .extrato(motoboyId, periodoInicio, periodoFim)
+      .linhas.filter((l) => l.situacao === 'A_ACERTAR')
+    if (aptas.length === 0) {
+      return regraViolada(
+        request,
+        'REGRA_NEGOCIO_VIOLADA',
+        'Não há entregas finalizadas, sem revisão pendente e fora de recibo no período informado.',
+      )
+    }
+    if (aptas.some((l) => l.valorRepasse == null)) {
+      return regraViolada(request, 'ENTREGA_INAPTA_RECIBO', 'O valor de repasse não está definido.')
+    }
+    // S013: período que alcança um dia já fechado.
+    if (aptas.some((l) => caixaDoDia(l.finalizadaEm!.slice(0, 10))?.status === 'FECHADO')) {
+      return regraViolada(request, 'CAIXA_FECHADO', 'O período alcança um dia com caixa fechado.')
     }
 
-    const novoRecibo: ReciboResponse = {
+    const recibo = criarReciboResponse({
       id: crypto.randomUUID(),
-      estabelecimentoId: IDS.estabelecimento,
-      caixaId: IDS.caixa,
+      caixaId: caixa.id,
       motoboyId,
-      usuarioGeradorId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-      dataReferencia: '2026-11-09',
-      periodoInicio: corpo.periodoInicio as string,
-      periodoFim: corpo.periodoFim as string,
-      qtdEntregas: 1,
-      valorTotal: 9,
-      status: 'GERADO',
-      criadoEm: '2026-11-09T17:30:00',
-    }
-    dbAcerto.inserirRecibo(novoRecibo)
-    return HttpResponse.json(novoRecibo, { status: 201 })
+      dataReferencia: caixa.dataReferencia,
+      periodoInicio,
+      periodoFim,
+      qtdEntregas: aptas.length,
+      valorTotal: somarNoServidor(aptas.map((l) => l.valorRepasse)),
+    })
+    dbAcerto.inserirRecibo(recibo)
+    aptas.forEach((l) => dbAcerto.atualizarFinalizada(l.entregaId, { reciboId: recibo.id }))
+    return HttpResponse.json(recibo, { status: 201 })
   }),
 
-  /** POST /api/recibos/:id/pagar — marcar como pago. Confirmado (S009). */
-  http.post('*/api/recibos/:id/pagar', ({ params }) => {
-    const id = params.id as string
-    const recibo = dbAcerto.recibos().find((r) => r.id === id)
-    if (!recibo) {
-      return erroApi(404, 'RECIBO_NAO_ENCONTRADO', 'Recibo nao encontrado.')
-    }
+  http.post('*/api/recibos/:id/pagar', ({ params, request }) => {
+    const recibo = dbAcerto.recibos().find((r) => r.id === params.id)
+    if (!recibo) return naoEncontrado(request)
     if (recibo.status !== 'GERADO') {
-      return erroApi(422, 'RECIBO_INALTERAVEL', 'So recibos GERADO podem ser marcados como pago.')
+      return regraViolada(request, 'TRANSICAO_ESTADO_INVALIDA', 'Transição de estado inválida para Recibo.')
     }
-    const atualizado = dbAcerto.atualizarRecibo(id, {
-      status: 'PAGO',
-      pagoEm: '2026-11-09T18:00:00',
-      atualizadoEm: '2026-11-09T18:00:00',
-    })
-    return HttpResponse.json(atualizado)
+    if (dbAcerto.caixas().find((c) => c.id === recibo.caixaId)?.status === 'FECHADO') {
+      return regraViolada(request, 'CAIXA_FECHADO', 'O caixa está fechado.')
+    }
+    return HttpResponse.json(
+      dbAcerto.atualizarRecibo(recibo.id, { status: 'PAGO', pagoEm: '2026-11-09T18:00:00.123456' }),
+    )
   }),
 
-  /** POST /api/recibos/:id/cancelar — cancelar recibo. Confirmado (S009). */
-  http.post('*/api/recibos/:id/cancelar', async ({ params, request }) => {
-    const id = params.id as string
-    const recibo = dbAcerto.recibos().find((r) => r.id === id)
-    if (!recibo) {
-      return erroApi(404, 'RECIBO_NAO_ENCONTRADO', 'Recibo nao encontrado.')
-    }
-    const corpo = (await request.json()) as Record<string, unknown>
-    if (!corpo.motivo || (corpo.motivo as string).trim() === '') {
-      return erroApi(400, 'DADOS_INVALIDOS', 'O motivo e obrigatorio.')
-    }
-    const atualizado = dbAcerto.atualizarRecibo(id, {
-      status: 'CANCELADO',
-      atualizadoEm: '2026-11-09T18:10:00',
-    })
-    return HttpResponse.json(atualizado)
-  }),
-
-  /** GET /api/caixas/atual — caixa do dia. Confirmado (S009). */
-  http.get(`*${ENDPOINTS.caixas.atual}`, () => {
+  http.get(`*${ENDPOINTS.caixas.atual}`, ({ request }) => {
     const caixa = dbAcerto.caixaAtual()
-    if (!caixa) {
-      return erroApi(404, 'CAIXA_NAO_ENCONTRADO', 'Nao ha caixa aberto para hoje.')
-    }
-    return HttpResponse.json(caixa)
+    return caixa ? HttpResponse.json(caixa) : naoEncontrado(request)
   }),
 
-  /** GET /api/caixas — historico. Confirmado (S009). */
-  http.get(`*${ENDPOINTS.caixas.listar}`, () => {
-    return HttpResponse.json(dbAcerto.historicoCaixas())
+  http.get(`*${ENDPOINTS.caixas.listar}`, ({ request }) => {
+    const p = new URL(request.url).searchParams
+    const de = p.get('dataInicio')
+    const ate = p.get('dataFim')
+    return HttpResponse.json(
+      dbAcerto
+        .caixas()
+        .filter((c) => !de || !ate || (c.dataReferencia >= de && c.dataReferencia <= ate)),
+    )
   }),
 
-  /** POST /api/caixas — abrir caixa. Confirmado (S009). */
   http.post(`*${ENDPOINTS.caixas.abrir}`, async ({ request }) => {
-    const corpo = (await request.json()) as Record<string, unknown>
-    const dataReferencia = corpo.dataReferencia as string
-
-    // Verificar se ja existe caixa para o dia
-    const existente = dbAcerto.caixaAtual()
-    if (existente) {
-      return erroApi(409, 'CAIXA_JA_ABERTO', 'Ja existe um caixa aberto para esta data.')
+    const { dataReferencia } = (await request.json()) as { dataReferencia: string }
+    if (caixaDoDia(dataReferencia)) {
+      return erroApi(request, 409, 'CAIXA_JA_ABERTO', 'Já existe um caixa registrado para esta data.')
     }
-
-    const novoCaixa = {
-      id: crypto.randomUUID(),
-      estabelecimentoId: IDS.estabelecimento,
-      dataReferencia,
-      abertoEm: '2026-11-09T08:00:00',
-      status: 'ABERTO' as const,
-      criadoEm: '2026-11-09T08:00:00',
-    }
-    dbAcerto.definirCaixaAtual(novoCaixa)
-    dbAcerto.inserirCaixa(novoCaixa)
-    return HttpResponse.json(novoCaixa, { status: 201 })
+    const caixa = criarCaixaResponse({ id: crypto.randomUUID(), dataReferencia })
+    dbAcerto.inserirCaixa(caixa)
+    return HttpResponse.json(caixa, { status: 201 })
   }),
 
-  /** POST /api/caixas/:id/fechar — fechar caixa. Confirmado (S009). */
-  http.post('*/api/caixas/:id/fechar', ({ params }) => {
-    const id = params.id as string
-    const caixa = dbAcerto.caixaAtual()
-    if (!caixa || caixa.id !== id) {
-      return erroApi(404, 'CAIXA_NAO_ENCONTRADO', 'Caixa nao encontrado.')
-    }
-    if (caixa.status === 'FECHADO') {
-      return erroApi(422, 'TRANSICAO_ESTADO_INVALIDA', 'O caixa ja esta fechado.')
-    }
-    const atualizado = dbAcerto.atualizarCaixa(id, {
-      status: 'FECHADO',
-      fechadoEm: '2026-11-09T22:00:00',
-      atualizadoEm: '2026-11-09T22:00:00',
-    })
-    if (atualizado) dbAcerto.definirCaixaAtual(atualizado)
-    return HttpResponse.json(atualizado)
+  http.post('*/api/caixas/:id/fechar', ({ params, request }) => {
+    const caixa = dbAcerto.caixas().find((c) => c.id === params.id)
+    if (!caixa) return naoEncontrado(request)
+    if (caixa.status === 'FECHADO') return regraViolada(request, 'CAIXA_FECHADO', 'O caixa está fechado.')
+    const validos = dbAcerto.recibos().filter((r) => r.caixaId === caixa.id && r.status !== 'CANCELADO')
+    return HttpResponse.json(
+      dbAcerto.atualizarCaixa(caixa.id, {
+        status: 'FECHADO',
+        fechadoEm: '2026-11-09T22:00:00.123456',
+        usuarioFechamentoId: OPERADOR,
+        qtdRecibos: validos.length,
+        valorTotal: somarNoServidor(validos.map((r) => r.valorTotal)),
+      }),
+    )
   }),
 ]

@@ -6,7 +6,9 @@
  * Endpoints de lotes confirmados pelo backend (S008, T006 do backend).
  * Endpoints de motoboys confirmados pelo backend (S008, T006 do backend).
  * Endpoints de acerto/recibos/caixa confirmados pelo backend (S009, T007 do backend).
- * Os demais continuam PROVISORIOS ate o backend publicar os controllers.
+ * Loja, integracao e restaurantes confirmados pelo backend (S010, T008 do backend).
+ * Todos conferidos contra os controllers da develop 8c02b47 (T009, 22/11/2026): as listagens
+ * devolvem lista simples, sem paginacao.
  */
 
 type Id = string
@@ -14,7 +16,7 @@ type Id = string
 export const ENDPOINTS = {
   auth: {
     login: '/api/auth/login', // Confirmado (S006)
-    refresh: '/api/auth/refresh', // Confirmado (S006)
+    refresh: '/api/auth/refresh', // Confirmado (S006); a regra do refresh esta fora do DVP 3.1 (D002)
   },
   entregas: {
     // Confirmado (S007) — filtros ?status=AGUARDANDO_DESPACHO e ?pendenteRevisao=true
@@ -61,19 +63,19 @@ export const ENDPOINTS = {
     reabrir: (id: Id) => `/api/caixas/${encodeURIComponent(id)}/reabrir`, // Confirmado (S009) — POST (so ADMIN_RESTAURANTE)
   },
   faixasPreco: {
-    listar: '/api/faixas-preco', // PROVISORIO
-    salvarTabela: '/api/faixas-preco', // PROVISORIO — PUT da tabela inteira (DVP 1.5.4)
+    listar: '/api/faixas-preco', // Confirmado (S010) — GET, so ADMIN_RESTAURANTE
+    salvarTabela: '/api/faixas-preco', // Confirmado (S010) — PUT da tabela inteira (DVP 1.5.4)
   },
   estabelecimento: {
-    atual: '/api/estabelecimento', // PROVISORIO — GET/PATCH da loja do token (GET existe no backend e respondeu 200 em 17/11, T008)
+    atual: '/api/estabelecimento', // Confirmado (S010) — GET (OPERACAO) / PATCH (LOJA)
   },
   integracoes: {
-    configuracao: '/api/integracoes', // PROVISORIO — GET/PUT
-    falhas: '/api/falhas-integracao', // PROVISORIO — ?status=PENDENTE
+    configuracao: '/api/integracoes', // Confirmado (S010) — GET devolve lista / PUT
+    falhas: '/api/falhas-integracao', // Confirmado (S010) — GET ?status= (padrao PENDENTE)
   },
   estabelecimentos: {
-    listar: '/api/estabelecimentos', // PROVISORIO — ADMIN_GERAL
-    criar: '/api/estabelecimentos', // PROVISORIO — ADMIN_GERAL
-    alterarStatus: (id: Id) => `/api/estabelecimentos/${encodeURIComponent(id)}/status`, // PROVISORIO
+    listar: '/api/estabelecimentos', // Confirmado (S010) — ADMIN_GERAL
+    criar: '/api/estabelecimentos', // Confirmado (S010) — POST 201, com administrador aninhado
+    alterarStatus: (id: Id) => `/api/estabelecimentos/${encodeURIComponent(id)}/status`, // Confirmado (S010) — PATCH
   },
 } as const

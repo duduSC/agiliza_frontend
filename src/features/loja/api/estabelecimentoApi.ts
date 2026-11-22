@@ -1,8 +1,7 @@
 /**
  * Estabelecimento do token (T008). `GET /api/estabelecimento` existe no backend
  * (`EstabelecimentoController.meuEstabelecimento`, perfil OPERACAO) e foi conferido contra o
- * backend real em 17/11/2026; o caminho continua marcado como PROVISORIO em `endpoints.ts` ate
- * o backend registrar a confirmacao no canal de sugestoes.
+ * backend real em 17/11/2026 e confirmado na S010.
  */
 import { useQuery } from '@tanstack/react-query'
 import { useSessaoStore } from '@/features/auth'

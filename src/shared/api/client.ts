@@ -6,20 +6,35 @@
  *   (o token NUNCA é lido de localStorage/cookie — Constituição, Artigo 6.1);
  * - valida toda resposta com Zod antes de devolver (Artigo 7.2);
  * - normaliza erros em `ErroApi`; 401 → `aoNaoAutenticado`, 403 → `aoAcessoNegado` (Artigo 6.3);
+ * - tempo limite por requisição, para servidor travado não deixar a tela em "Carregando" para sempre;
  * - repassa `AbortSignal` (cancelamento pelo TanStack Query).
  *
  * Nunca registra em log o corpo das requisições/respostas (Artigo 6.5).
  */
 import type { z } from 'zod'
-import { erroDeRede, erroRespostaInvalida, parseErroApi, type ErroApi } from './erros'
+import {
+  erroDeRede,
+  erroDeTempoEsgotado,
+  erroRespostaInvalida,
+  parseErroApi,
+  type ErroApi,
+} from './erros'
 
 export type MetodoHttp = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type ValorQuery = string | number | boolean | null | undefined
 
+/** Maior que os 10 s que o backend pode esperar pela trava da loja (S013). */
+export const TEMPO_LIMITE_MS = 20_000
+
 type ConfiguracaoCliente = {
   obterToken: () => string | null
-  /** Tenta renovar o token de acesso. Retorna o novo token ou null se falhar. */
+  /**
+   * Quem está logado. Se mudar durante a requisição, a resposta 401/403 dela não age sobre a
+   * sessão nova e a escrita não é repetida com o token de outra pessoa.
+   */
+  obterSessao: () => string | null
+  /** Tenta renovar o token de acesso. Retorna o novo token ou null se a sessão não vale mais. */
   tentarRefresh: () => Promise<string | null>
   aoNaoAutenticado: (erro: ErroApi) => void
   aoAcessoNegado: (erro: ErroApi) => void
@@ -27,6 +42,7 @@ type ConfiguracaoCliente = {
 
 const configuracaoPadrao: ConfiguracaoCliente = {
   obterToken: () => null,
+  obterSessao: () => null,
   tentarRefresh: () => Promise.resolve(null),
   aoNaoAutenticado: () => {},
   aoAcessoNegado: () => {},
@@ -74,8 +90,7 @@ export function montarUrl(caminho: string, query?: Record<string, ValorQuery>): 
   return url.toString()
 }
 
-async function lerJson(resposta: Response): Promise<unknown> {
-  const texto = await resposta.text()
+function interpretarJson(texto: string): unknown {
   if (texto.trim() === '') return null
   try {
     return JSON.parse(texto) as unknown
@@ -88,6 +103,45 @@ function ehAbort(erro: unknown): boolean {
   return erro instanceof DOMException && erro.name === 'AbortError'
 }
 
+type Resposta = { ok: boolean; status: number; dados: unknown }
+
+/** Uma ida ao servidor, com tempo limite que cobre também a leitura do corpo. */
+async function enviar(opcoes: OpcoesRequisicao, token: string | null): Promise<Resposta> {
+  const { metodo = 'GET', caminho, query, corpo, signal } = opcoes
+
+  const headers = new Headers({ Accept: 'application/json' })
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (corpo !== undefined) headers.set('Content-Type', 'application/json')
+
+  const controle = new AbortController()
+  const abortar = () => controle.abort()
+  if (signal?.aborted) abortar()
+  else signal?.addEventListener('abort', abortar, { once: true })
+
+  let estourouPrazo = false
+  const prazo = setTimeout(() => {
+    estourouPrazo = true
+    abortar()
+  }, TEMPO_LIMITE_MS)
+
+  try {
+    const resposta = await fetch(montarUrl(caminho, query), {
+      method: metodo,
+      headers,
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      signal: controle.signal,
+    })
+    return { ok: resposta.ok, status: resposta.status, dados: interpretarJson(await resposta.text()) }
+  } catch (erro) {
+    if (estourouPrazo) throw erroDeTempoEsgotado(metodo !== 'GET')
+    if (ehAbort(erro) || signal?.aborted) throw erro
+    throw erroDeRede()
+  } finally {
+    clearTimeout(prazo)
+    signal?.removeEventListener('abort', abortar)
+  }
+}
+
 export function requisitar<S extends z.ZodType>(
   opcoes: OpcoesRequisicao & { schema: S },
 ): Promise<z.output<S>>
@@ -95,69 +149,34 @@ export function requisitar(opcoes: OpcoesRequisicao & { schema?: undefined }): P
 export async function requisitar(
   opcoes: OpcoesRequisicao & { schema?: z.ZodType },
 ): Promise<unknown> {
-  const { metodo = 'GET', caminho, query, corpo, signal, schema } = opcoes
+  const { caminho, schema } = opcoes
   const tratarAuth = opcoes.tratarAutenticacaoGlobal ?? true
+  const sessao = configuracao.obterSessao()
+  const mesmaSessao = () => configuracao.obterSessao() === sessao
+  const tokenEnviado = configuracao.obterToken()
 
-  const headers = new Headers({ Accept: 'application/json' })
-  const token = configuracao.obterToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-  if (corpo !== undefined) headers.set('Content-Type', 'application/json')
+  let resposta = await enviar(opcoes, tokenEnviado)
 
-  let resposta: Response
-  try {
-    resposta = await fetch(montarUrl(caminho, query), {
-      method: metodo,
-      headers,
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
-      signal,
-    })
-  } catch (erro) {
-    if (ehAbort(erro) || signal?.aborted) throw erro
-    throw erroDeRede()
+  // 401 é recusado antes do controller, então repetir a requisição (mesmo escrita) é seguro.
+  if (tratarAuth && resposta.status === 401 && mesmaSessao()) {
+    const tokenAtual = configuracao.obterToken()
+    // Outra requisição já pode ter renovado o token enquanto esta estava no ar.
+    const token = tokenAtual !== tokenEnviado ? tokenAtual : await configuracao.tentarRefresh()
+    if (token && mesmaSessao()) resposta = await enviar(opcoes, token)
   }
 
   if (!resposta.ok) {
-    const erro = parseErroApi(resposta.status, await lerJson(resposta))
-
-    // Refresh automatico: tenta renovar o token antes de encerrar a sessao (T007).
-    if (tratarAuth && resposta.status === 401) {
-      const novoToken = await configuracao.tentarRefresh()
-      if (novoToken) {
-        // Retry com o novo token
-        const headersRetry = new Headers(headers)
-        headersRetry.set('Authorization', `Bearer ${novoToken}`)
-        try {
-          const retentativa = await fetch(montarUrl(caminho, query), {
-            method: metodo,
-            headers: headersRetry,
-            body: corpo === undefined ? undefined : JSON.stringify(corpo),
-            signal,
-          })
-          if (retentativa.ok) {
-            if (!schema) return undefined
-            const dadosRetry = await lerJson(retentativa)
-            const resultadoRetry = schema.safeParse(dadosRetry)
-            if (!resultadoRetry.success) throw erroRespostaInvalida(retentativa.status, caminho)
-            return resultadoRetry.data
-          }
-          // Retry tambem falhou — cai no fluxo normal de encerrar sessao
-        } catch (erroRetry) {
-          if (ehAbort(erroRetry) || signal?.aborted) throw erroRetry
-          // Retry falhou por rede — segue para aoNaoAutenticado
-        }
-      }
-      configuracao.aoNaoAutenticado(erro)
+    const erro = parseErroApi(resposta.status, resposta.dados)
+    if (tratarAuth && mesmaSessao()) {
+      if (resposta.status === 401) configuracao.aoNaoAutenticado(erro)
+      if (resposta.status === 403) configuracao.aoAcessoNegado(erro)
     }
-    if (tratarAuth && resposta.status === 403) configuracao.aoAcessoNegado(erro)
     throw erro
   }
 
   if (!schema) return undefined
 
-  const dados = await lerJson(resposta)
-  const resultado = schema.safeParse(dados)
-  if (!resultado.success) {
-    throw erroRespostaInvalida(resposta.status, caminho)
-  }
+  const resultado = schema.safeParse(resposta.dados)
+  if (!resultado.success) throw erroRespostaInvalida(resposta.status, caminho)
   return resultado.data
 }
