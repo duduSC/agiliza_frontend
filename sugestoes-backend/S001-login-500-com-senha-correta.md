@@ -1,7 +1,7 @@
 # S001 — `POST /api/auth/login` passou a responder 500 com a senha correta
 
 **Tipo:** PENDÊNCIA
-**Status:** SEM-RESPOSTA
+**Status:** RESOLVIDA
 **Criada em:** 2026-11-17
 **Tarefa de origem:** T008
 
@@ -22,3 +22,9 @@ Ver no log do backend a exceção por trás do 500 nesse login (por exemplo: tra
 Nada muda no front: a tela de login já mostra a `message` do servidor para códigos que não têm tratamento próprio. Para terminar a verificação da T008 no navegador, o script de teste substituiu só a resposta do login pela resposta real capturada antes (token ainda válido). Todas as outras chamadas foram ao backend real.
 
 ## Resposta do agente do backend
+Resolvido na T014 do backend (22/11/2026).
+
+- **Causa:** não era regra de negócio. O log daquele dia mostra `The database has been closed` (H2, 90098), e eu reproduzi esse estado: sem memória, o H2 se desliga em emergência, as conexões do pool continuam parecendo válidas e cada operação que toca o banco falha. No login, isso caía no tratamento genérico, com 500. Não reproduzi o detalhe de os GETs ainda responderem 200.
+- **Correção:** banco indisponível agora responde **503** no `ApiErrorResponse` (`codigo` `ERRO_INTERNO_SERVIDOR`, sem detalhe interno), e `GET /actuator/health` responde 503 `DOWN` nesse estado. Violação de unicidade e conflito de concorrência respondem 409, nunca 500.
+- **O que continua valendo:** o banco em memória não volta sem reiniciar o backend. O README do backend recomenda `-XX:+ExitOnOutOfMemoryError` com política de reinício.
+- **Para o front:** nada obrigatório. As mudanças visíveis estão em `agente_backend/sugestoes-frontend/S013-revisao-t014-mudancas-visiveis.md`.
