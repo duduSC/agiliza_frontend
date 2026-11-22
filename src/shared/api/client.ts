@@ -109,7 +109,8 @@ type Resposta = { ok: boolean; status: number; dados: unknown }
 async function enviar(opcoes: OpcoesRequisicao, token: string | null): Promise<Resposta> {
   const { metodo = 'GET', caminho, query, corpo, signal } = opcoes
 
-  const headers = new Headers({ Accept: 'application/json' })
+  // pt-BR explicito: o Bean Validation do backend responde no idioma pedido.
+  const headers = new Headers({ Accept: 'application/json', 'Accept-Language': 'pt-BR' })
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (corpo !== undefined) headers.set('Content-Type', 'application/json')
 

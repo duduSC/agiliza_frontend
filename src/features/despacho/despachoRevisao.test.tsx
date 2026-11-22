@@ -176,3 +176,13 @@ describe('robustez', () => {
     }, ESPERA)
   })
 })
+
+describe('passada adversarial', () => {
+  it('loja fora não herda o limite de quem usou antes: vale o padrão 5', async () => {
+    useSelecaoStore.setState({ maxPedidosPorLote: 9 })
+    server.use(http.get('*/api/estabelecimento', () => new HttpResponse(null, { status: 422 })))
+    renderizarApp('/despacho')
+    await screen.findByRole('checkbox', { name: 'Selecionar entrega de Ana Souza' }, ESPERA)
+    expect(useSelecaoStore.getState().maxPedidosPorLote).toBe(5)
+  })
+})

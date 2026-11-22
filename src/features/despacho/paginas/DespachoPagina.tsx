@@ -35,7 +35,8 @@ export function DespachoPagina() {
   const definirLimite = useSelecaoStore((s) => s.definirLimite)
   const maxPedidosPorLote = loja.data?.maxPedidosPorLote
   useEffect(() => {
-    if (maxPedidosPorLote != null && maxPedidosPorLote > 0) definirLimite(maxPedidosPorLote)
+    // Sem a loja, o padrao do DVP, e nao o limite que sobrou da sessao anterior.
+    definirLimite(maxPedidosPorLote && maxPedidosPorLote > 0 ? maxPedidosPorLote : 5)
   }, [maxPedidosPorLote, definirLimite])
 
   // Quem saiu da lista (despachada por outro, cancelada, em revisao) sai da selecao.

@@ -140,3 +140,15 @@ describe('mensagens de erro', () => {
     expect(retry(0, erroRespostaInvalida(200, '/api/x'))).toBe(false)
   })
 })
+
+it('pede as mensagens do Bean Validation em pt-BR, seja qual for o idioma do navegador', async () => {
+  let idioma: string | null = null
+  server.use(
+    http.get('*/api/teste-idioma', ({ request }) => {
+      idioma = request.headers.get('Accept-Language')
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  await requisitar({ caminho: '/api/teste-idioma' })
+  expect(idioma).toBe('pt-BR')
+})

@@ -90,6 +90,20 @@ export function AcertoPagina() {
     })
   }
 
+  function filtrar(novo: FiltroAcertoValues) {
+    setFiltroAtivo(novo)
+    const repetido =
+      filtroAtivo?.motoboyId === novo.motoboyId &&
+      filtroAtivo.inicio === novo.inicio &&
+      filtroAtivo.fim === novo.fim
+    // Mesma chave nao refaz a consulta sozinha, e esta tela nao tem tempo real.
+    if (repetido) {
+      void extratoQuery.refetch()
+      void recibosQuery.refetch()
+      void caixasQuery.refetch()
+    }
+  }
+
   function abrirGerarRecibo() {
     setDialogoRecibo(true)
     // A previa nao pode ser a do cache: o servidor calcula o recibo na hora.
@@ -123,7 +137,7 @@ export function AcertoPagina() {
       {motoboysQuery.data?.length === 0 && <Aviso>Nenhum entregador cadastrado nesta loja.</Aviso>}
       <FiltroAcerto
         motoboys={motoboysQuery.data ?? []}
-        aoFiltrar={setFiltroAtivo}
+        aoFiltrar={filtrar}
         carregando={extratoQuery.isFetching}
       />
 

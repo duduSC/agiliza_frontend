@@ -10,9 +10,9 @@ import {
   CAMINHO_LOGIN,
   obterRefreshTokenDaSessao,
   obterTokenDaSessao,
+  renovarToken,
   useSessaoStore,
 } from '@/features/auth'
-import { renovarToken } from '@/features/auth/api/authApi'
 import { configurarCliente } from '@/shared/api/client'
 import { ehErroApi } from '@/shared/api/erros'
 

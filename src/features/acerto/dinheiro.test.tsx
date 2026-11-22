@@ -348,3 +348,14 @@ describe('total sem valor definido nunca parece R$ 0,00 (5.1)', () => {
     expect(screen.getByRole('dialog').textContent).not.toMatch(/R\$\s0,00/)
   })
 })
+
+describe('passada adversarial', () => {
+  it('filtrar de novo com os mesmos dados relê o extrato', async () => {
+    await filtrar()
+    await extratoNaTela()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Filtrar' })).toBeEnabled(), ESPERA)
+    dbAcerto.atualizarFinalizada(IDS_ACERTO.entregaSemRecibo, { valorRepasse: 14.25 })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(screen.getAllByText(/14,25/).length).toBeGreaterThan(0), { timeout: 3000 })
+  })
+})
