@@ -12,16 +12,19 @@ type Props = {
 export function TotaisExtrato({ extrato }: Props) {
   return (
     <div className="flex flex-wrap gap-4">
-      <CardTotal label="Total devido" valor={extrato.totalDevido} />
+      <CardTotal
+        label={extrato.possuiValorIndefinido ? 'Total devido (parcial)' : 'Total devido'}
+        valor={extrato.totalDevido}
+      />
       <CardTotal label="Total consolidado" valor={extrato.totalConsolidado} />
-      <CardTotal label="Em revisao" valor={extrato.totalEmRevisao} destaque={extrato.totalEmRevisao > 0} />
+      <CardTotal label="Em revisão" valor={extrato.totalEmRevisao} destaque={extrato.totalEmRevisao > 0} />
       {extrato.possuiValorIndefinido && (
         <div
           role="alert"
           className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm text-yellow-900"
         >
           <span aria-hidden="true">&#9888;</span>
-          Ha entregas sem valor calculado
+          Há entregas sem valor calculado
         </div>
       )}
     </div>

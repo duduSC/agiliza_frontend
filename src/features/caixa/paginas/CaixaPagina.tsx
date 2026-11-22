@@ -10,6 +10,7 @@
  * - Sem atualizacao otimista (Constituicao 5.8).
  */
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useSessaoStore } from '@/features/auth'
 import { podeReabrirCaixa } from '@/shared/dominio'
 import { LABEL_STATUS_CAIXA } from '@/shared/dominio'
@@ -29,6 +30,12 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog'
 import { ehErroApi } from '@/shared/api/erros'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
+import { Input } from '@/shared/ui/input'
+import { Label } from '@/shared/ui/label'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
+
+const PALAVRA_DE_CONFIRMACAO = 'FECHAR'
 
 export function CaixaPagina() {
   const perfil = useSessaoStore((s) => s.usuario?.perfil)
@@ -44,35 +51,48 @@ export function CaixaPagina() {
 
   const caixa = caixaQuery.data
 
+  const [confirmacao, setConfirmacao] = useState('')
+  const [erroFechar, setErroFechar] = useState<string | null>(null)
+  const abrirUmaVez = useEnvioUnico()
+  const fecharUmaVez = useEnvioUnico()
+
+  const caixaAberto = caixa?.status === 'ABERTO' || caixa?.status === 'REABERTO'
+  const podeConfirmar =
+    caixaAberto &&
+    !fecharCaixaMutation.isPending &&
+    confirmacao.trim().toUpperCase() === PALAVRA_DE_CONFIRMACAO
+
   function handleAbrirCaixa() {
-    setErroLocal(null)
-    const dataReferencia = paraLocalDateBackend(new Date())
-    abrirCaixaMutation.mutate(
-      { dataReferencia },
-      {
-        onError: (erro) => {
-          if (ehErroApi(erro)) {
-            setErroLocal(erro.mensagem)
-          } else {
-            setErroLocal('Erro ao abrir caixa.')
-          }
-        },
-      },
-    )
+    void abrirUmaVez(async () => {
+      setErroLocal(null)
+      try {
+        await abrirCaixaMutation.mutateAsync({ dataReferencia: paraLocalDateBackend(new Date()) })
+        toast.success('Caixa aberto com sucesso.')
+      } catch (erro) {
+        setErroLocal(ehErroApi(erro) ? erro.mensagem : 'Não foi possível abrir o caixa.')
+      }
+    })
+  }
+
+  function mudarDialogo(aberto: boolean) {
+    if (fecharCaixaMutation.isPending) return
+    setDialogoFechar(aberto)
+    setConfirmacao('')
+    setErroFechar(null)
   }
 
   function handleFecharCaixa() {
     if (!caixa) return
-    setErroLocal(null)
-    fecharCaixaMutation.mutate(caixa.id, {
-      onSuccess: () => setDialogoFechar(false),
-      onError: (erro) => {
-        if (ehErroApi(erro)) {
-          setErroLocal(erro.mensagem)
-        } else {
-          setErroLocal('Erro ao fechar caixa.')
-        }
-      },
+    void fecharUmaVez(async () => {
+      setErroFechar(null)
+      try {
+        await fecharCaixaMutation.mutateAsync(caixa.id)
+        toast.success('Caixa fechado com sucesso.')
+        setDialogoFechar(false)
+        setConfirmacao('')
+      } catch (erro) {
+        setErroFechar(ehErroApi(erro) ? erro.mensagem : 'Não foi possível fechar o caixa.')
+      }
     })
   }
 
@@ -82,12 +102,12 @@ export function CaixaPagina() {
         <div>
           <h1 id="titulo-pagina" className="text-xl font-semibold">Caixa</h1>
           <p className="text-sm text-muted-foreground">
-            Caixa do dia: abertura, fechamento e historico.
+            Caixa do dia: abertura, fechamento e histórico.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {mostrarReabrir && (
-            <Button variant="outline" disabled title="Disponivel numa proxima versao (D007)">
+            <Button variant="outline" disabled title="Reabertura disponível em uma próxima versão">
               Reabrir caixa
             </Button>
           )}
@@ -95,18 +115,18 @@ export function CaixaPagina() {
       </header>
 
       {/* Caixa do dia */}
-      {caixaQuery.isLoading && <EstadoCarregando mensagem="Carregando caixa do dia..." />}
+      {caixaQuery.isLoading && <EstadoCarregando mensagem="Carregando caixa do dia…" />}
 
-      {caixaQuery.isError && (
+      {caixaQuery.isError && caixa === undefined && (
         <EstadoErro
           mensagem={
-            ehErroApi(caixaQuery.error) ? caixaQuery.error.mensagem : 'Erro ao carregar caixa.'
+            ehErroApi(caixaQuery.error) ? caixaQuery.error.mensagem : 'Não foi possível carregar o caixa.'
           }
           aoTentarNovamente={() => void caixaQuery.refetch()}
         />
       )}
 
-      {!caixaQuery.isLoading && !caixaQuery.isError && !caixa && (
+      {caixa === null && (
         <div className="rounded-lg border border-dashed p-6 text-center">
           <p className="mb-3 text-muted-foreground">
             Nenhum caixa aberto para hoje.
@@ -115,11 +135,12 @@ export function CaixaPagina() {
             onClick={handleAbrirCaixa}
             disabled={abrirCaixaMutation.isPending}
           >
-            {abrirCaixaMutation.isPending ? 'Abrindo...' : 'Abrir caixa do dia'}
+            {abrirCaixaMutation.isPending ? 'Abrindo…' : 'Abrir caixa do dia'}
           </Button>
         </div>
       )}
 
+      <AvisoDesatualizado consulta={caixaQuery} />
       {caixa && (
         <div className="rounded-lg border p-4">
           <div className="mb-4 flex flex-wrap items-center gap-4">
@@ -156,7 +177,7 @@ export function CaixaPagina() {
             <div className="mt-4 flex gap-2">
               <Button
                 variant="destructive"
-                onClick={() => setDialogoFechar(true)}
+                onClick={() => mudarDialogo(true)}
               >
                 Fechar caixa
               </Button>
@@ -165,7 +186,7 @@ export function CaixaPagina() {
 
           {caixa.status === 'FECHADO' && (
             <p role="status" className="mt-4 text-sm text-yellow-700">
-              Caixa fechado — periodo imutavel. Ajustes e geracao de recibos estao desabilitados.
+              Caixa fechado — período imutável. Ajustes, pagamentos e geração de recibos estão desabilitados.
             </p>
           )}
         </div>
@@ -177,11 +198,16 @@ export function CaixaPagina() {
 
       {/* Historico */}
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Historico</h2>
-        {historicoQuery.isLoading && <EstadoCarregando mensagem="Carregando historico..." />}
-        {historicoQuery.isError && (
+        <h2 className="text-lg font-semibold">Histórico</h2>
+        {historicoQuery.isLoading && <EstadoCarregando mensagem="Carregando histórico…" />}
+        <AvisoDesatualizado consulta={historicoQuery} />
+        {historicoQuery.isError && !historicoQuery.data && (
           <EstadoErro
-            mensagem="Erro ao carregar historico."
+            mensagem={
+              ehErroApi(historicoQuery.error)
+                ? historicoQuery.error.mensagem
+                : 'Não foi possível carregar o histórico.'
+            }
             aoTentarNovamente={() => void historicoQuery.refetch()}
           />
         )}
@@ -189,18 +215,35 @@ export function CaixaPagina() {
       </div>
 
       {/* Dialogo de confirmacao para fechar caixa */}
-      <Dialog open={dialogoFechar} onOpenChange={setDialogoFechar}>
+      <Dialog open={dialogoFechar} onOpenChange={mudarDialogo}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Fechar caixa</DialogTitle>
             <DialogDescription>
-              Esta acao torna o periodo imutavel. Nao sera possivel ajustar repasses nem gerar novos recibos para o dia. Deseja continuar?
+              Fechar o caixa{caixa ? ` de ${formatarData(caixa.dataReferencia)}` : ''} torna o período
+              imutável. Não será possível ajustar repasses nem gerar recibos para o dia, e recibos
+              ainda não pagos não poderão mais ser marcados como pagos.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-1.5">
+            <Label htmlFor="confirmar-fechamento">Para confirmar, digite {PALAVRA_DE_CONFIRMACAO}</Label>
+            <Input
+              id="confirmar-fechamento"
+              value={confirmacao}
+              onChange={(e) => setConfirmacao(e.target.value)}
+              autoComplete="off"
+              disabled={fecharCaixaMutation.isPending}
+            />
+          </div>
+          {erroFechar && (
+            <p role="alert" className="text-sm text-red-700">
+              {erroFechar}
+            </p>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialogoFechar(false)}
+              onClick={() => mudarDialogo(false)}
               disabled={fecharCaixaMutation.isPending}
             >
               Cancelar
@@ -208,9 +251,9 @@ export function CaixaPagina() {
             <Button
               variant="destructive"
               onClick={handleFecharCaixa}
-              disabled={fecharCaixaMutation.isPending}
+              disabled={!podeConfirmar}
             >
-              {fecharCaixaMutation.isPending ? 'Fechando...' : 'Confirmar fechamento'}
+              {fecharCaixaMutation.isPending ? 'Fechando…' : 'Confirmar fechamento'}
             </Button>
           </DialogFooter>
         </DialogContent>

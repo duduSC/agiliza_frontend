@@ -84,3 +84,35 @@ describe('token desde a primeira requisicao de cada tela', () => {
     expect(refreshes).toBe(0)
   })
 })
+
+describe('refresh em condicao adversa (T009)', () => {
+  it('sair durante o refresh nao ressuscita o token', async () => {
+    let chamadas = 0
+    server.use(
+      http.get('*/api/teste', () => (++chamadas === 1 ? erro(401, 'NAO_AUTENTICADO') : HttpResponse.json({}))),
+      http.post('*/api/auth/refresh', () => {
+        useSessaoStore.getState().encerrarSessao()
+        return HttpResponse.json({
+          token: 'ressuscitado',
+          refreshToken: 'ressuscitado',
+          usuario: { usuarioId: 'b1b2c3d4-0003-4b00-8b00-00000000e003', nome: 'Operador', perfil: 'OPERADOR' },
+        })
+      }),
+    )
+    entrarComo('OPERADOR', 'vencido')
+    renderizarApp('/inicio')
+    await requisitar({ caminho: '/api/teste' }).catch(() => undefined)
+    expect(useSessaoStore.getState().token).toBeNull()
+  })
+
+  it('servidor fora durante o refresh mantem a sessao', async () => {
+    server.use(
+      http.get('*/api/teste', () => erro(401, 'NAO_AUTENTICADO')),
+      http.post('*/api/auth/refresh', () => erro(503, 'ERRO_INTERNO_SERVIDOR')),
+    )
+    entrarComo('OPERADOR', 'vencido')
+    renderizarApp('/inicio')
+    await requisitar({ caminho: '/api/teste' }).catch(() => undefined)
+    expect(useSessaoStore.getState().usuario).not.toBeNull()
+  })
+})

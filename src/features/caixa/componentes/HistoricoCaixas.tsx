@@ -33,7 +33,7 @@ export function HistoricoCaixas({ caixas }: Props) {
   if (caixas.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-muted-foreground">
-        Nenhum caixa encontrado no historico.
+        Nenhum caixa encontrado no histórico.
       </p>
     )
   }

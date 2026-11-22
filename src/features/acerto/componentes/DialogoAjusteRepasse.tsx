@@ -4,8 +4,10 @@
  * Sem atualizacao otimista (Constituicao 5.8).
  */
 import { useState } from 'react'
+import { toast } from 'sonner'
+import { z } from 'zod'
 import { useAjustes, useAjustarRepasse } from '../api/hooks'
-import { formatarMoeda } from '@/shared/formatacao'
+import { formatarMoeda, paraValorMonetarioBackend } from '@/shared/formatacao'
 import { formatarDataHora } from '@/shared/formatacao/dataHora'
 import { ehErroApi } from '@/shared/api/erros'
 import { Button } from '@/shared/ui/button'
@@ -19,7 +21,21 @@ import {
 } from '@/shared/ui/dialog'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
-import { EstadoCarregando } from '@/shared/ui/estados'
+import { EstadoCarregando, EstadoErro } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
+
+// Limites de AjustarRepasseRequest: @Digits(8, 2) e motivo ate 255.
+const ajusteSchema = z.object({
+  valorNovo: z
+    .string()
+    .trim()
+    .regex(/^\d{1,8}([.,]\d{1,2})?$/, 'Informe um valor válido, com até 2 casas decimais (ex.: 12,50).'),
+  motivo: z
+    .string()
+    .trim()
+    .min(1, 'O motivo é obrigatório.')
+    .max(255, 'Use no máximo 255 caracteres.'),
+})
 
 type Props = {
   entregaId: string
@@ -34,7 +50,11 @@ export function DialogoAjusteRepasse({ entregaId, valorAtual, reciboId, aberto, 
   const [motivo, setMotivo] = useState('')
   const [erroLocal, setErroLocal] = useState<string | null>(null)
 
-  const { data: ajustes, isLoading: carregandoAjustes } = useAjustes(aberto ? entregaId : null)
+  const [errosCampo, setErrosCampo] = useState<{ valorNovo?: string; motivo?: string }>({})
+  const envioUnico = useEnvioUnico()
+
+  const historico = useAjustes(aberto ? entregaId : null)
+  const { data: ajustes, isLoading: carregandoAjustes } = historico
   const mutation = useAjustarRepasse()
 
   // Entrega com recibo: mostrar mensagem e nao permitir ajuste (Constituicao 5.2)
@@ -45,7 +65,7 @@ export function DialogoAjusteRepasse({ entregaId, valorAtual, reciboId, aberto, 
           <DialogHeader>
             <DialogTitle>Ajuste de repasse</DialogTitle>
             <DialogDescription>
-              Esta entrega esta no recibo — o recibo precisa ser cancelado antes.
+              Esta entrega está no recibo #{reciboId.slice(0, 8)}. Cancele o recibo para corrigir.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -59,39 +79,46 @@ export function DialogoAjusteRepasse({ entregaId, valorAtual, reciboId, aberto, 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErroLocal(null)
+    setErrosCampo({})
 
-    const valor = parseFloat(valorNovo)
-    if (isNaN(valor) || valor < 0) {
-      setErroLocal('Informe um valor valido.')
+    const resultado = ajusteSchema.safeParse({ valorNovo, motivo })
+    if (!resultado.success) {
+      const { fieldErrors } = z.flattenError(resultado.error)
+      setErrosCampo({ valorNovo: fieldErrors.valorNovo?.[0], motivo: fieldErrors.motivo?.[0] })
       return
     }
-    if (!motivo.trim()) {
-      setErroLocal('O motivo e obrigatorio.')
+    const valor = paraValorMonetarioBackend(Number(resultado.data.valorNovo.replace(',', '.')))
+    if (valorAtual != null && valor === valorAtual) {
+      setErrosCampo({ valorNovo: 'Informe um valor diferente do valor atual.' })
       return
     }
 
-    mutation.mutate(
-      { entregaId, valorNovo: Math.round(valor * 100) / 100, motivo: motivo.trim() },
-      {
-        onSuccess: () => {
-          setValorNovo('')
-          setMotivo('')
-          aoFechar()
-        },
-        onError: (erro) => {
-          if (ehErroApi(erro)) {
-            setErroLocal(erro.mensagem)
-          } else {
-            setErroLocal('Erro ao ajustar repasse.')
-          }
-        },
-      },
-    )
+    void envioUnico(async () => {
+      try {
+        const ajuste = await mutation.mutateAsync({
+          entregaId,
+          valorNovo: valor,
+          motivo: resultado.data.motivo,
+        })
+        toast.success(`Repasse ajustado para ${formatarMoeda(ajuste.valorNovo)}.`)
+        aoFechar()
+      } catch (erro) {
+        if (!ehErroApi(erro)) {
+          setErroLocal('Não foi possível ajustar o repasse.')
+          return
+        }
+        const doServidor = (campo: string) => erro.campos.find((c) => c.campo === campo)?.mensagem
+        const doValor = doServidor('valorNovo')
+        const doMotivo = doServidor('motivo')
+        if (doValor || doMotivo) setErrosCampo({ valorNovo: doValor, motivo: doMotivo })
+        else setErroLocal(erro.mensagem)
+      }
+    })
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={(open) => { if (!open) aoFechar() }}>
-      <DialogContent>
+    <Dialog open={aberto} onOpenChange={(open) => { if (!open && !mutation.isPending) aoFechar() }}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajustar repasse</DialogTitle>
           <DialogDescription>
@@ -99,28 +126,36 @@ export function DialogoAjusteRepasse({ entregaId, valorAtual, reciboId, aberto, 
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ajuste-valor">Novo valor (R$)</Label>
             <Input
               id="ajuste-valor"
-              type="number"
-              step="0.01"
-              min="0"
+              inputMode="decimal"
+              aria-invalid={!!errosCampo.valorNovo}
+              aria-describedby={errosCampo.valorNovo ? 'ajuste-valor-erro' : undefined}
               value={valorNovo}
               onChange={(e) => setValorNovo(e.target.value)}
-              placeholder="0,00"
+              placeholder="Ex.: 12,50"
             />
+            {errosCampo.valorNovo && (
+              <p id="ajuste-valor-erro" className="text-sm text-red-700">{errosCampo.valorNovo}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ajuste-motivo">Motivo (obrigatorio)</Label>
+            <Label htmlFor="ajuste-motivo">Motivo (obrigatório)</Label>
             <Input
               id="ajuste-motivo"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Descreva o motivo do ajuste"
+              aria-invalid={!!errosCampo.motivo}
+              aria-describedby={errosCampo.motivo ? 'ajuste-motivo-erro' : undefined}
             />
+            {errosCampo.motivo && (
+              <p id="ajuste-motivo-erro" className="text-sm text-red-700">{errosCampo.motivo}</p>
+            )}
           </div>
 
           {erroLocal && (
@@ -132,15 +167,21 @@ export function DialogoAjusteRepasse({ entregaId, valorAtual, reciboId, aberto, 
               Cancelar
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Salvar ajuste'}
+              {mutation.isPending ? 'Salvando…' : 'Salvar ajuste'}
             </Button>
           </DialogFooter>
         </form>
 
         {/* Historico de ajustes */}
         <div className="mt-4 border-t pt-4">
-          <h4 className="mb-2 text-sm font-medium">Historico de ajustes</h4>
-          {carregandoAjustes && <EstadoCarregando mensagem="Carregando historico..." />}
+          <h4 className="mb-2 text-sm font-medium">Histórico de ajustes</h4>
+          {carregandoAjustes && <EstadoCarregando mensagem="Carregando histórico…" />}
+          {historico.isError && !ajustes && (
+            <EstadoErro
+              mensagem={ehErroApi(historico.error) ? historico.error.mensagem : 'Histórico indisponível.'}
+              aoTentarNovamente={() => void historico.refetch()}
+            />
+          )}
           {ajustes && ajustes.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhum ajuste anterior.</p>
           )}

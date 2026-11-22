@@ -58,9 +58,14 @@ export function useRecibos(motoboyId: string | null) {
 function useInvalidarAcerto() {
   const queryClient = useQueryClient()
   const estabelecimentoId = useEstabelecimentoDaSessao()
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: chavesAcerto.todas(estabelecimentoId) })
-    void queryClient.invalidateQueries({ queryKey: chavesRecibos.todas(estabelecimentoId) })
+  // No sucesso e no erro (recusa costuma ser estado que mudou, como caixa fechado por outro).
+  // A mutacao so termina com as listas recarregadas.
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: chavesAcerto.todas(estabelecimentoId) }),
+      queryClient.invalidateQueries({ queryKey: chavesRecibos.todas(estabelecimentoId) }),
+      queryClient.invalidateQueries({ queryKey: ['caixa', estabelecimentoId] }),
+    ])
   }
 }
 
@@ -69,7 +74,7 @@ export function useAjustarRepasse() {
   return useMutation({
     mutationFn: ({ entregaId, valorNovo, motivo }: { entregaId: string; valorNovo: number; motivo: string }) =>
       ajustarRepasse(entregaId, valorNovo, motivo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -77,7 +82,7 @@ export function useGerarRecibo() {
   const invalidar = useInvalidarAcerto()
   return useMutation({
     mutationFn: (corpo: GerarReciboRequest) => gerarRecibo(corpo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -85,6 +90,6 @@ export function useMarcarReciboPago() {
   const invalidar = useInvalidarAcerto()
   return useMutation({
     mutationFn: (id: string) => marcarReciboPago(id),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
