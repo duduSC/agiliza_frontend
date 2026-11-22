@@ -17,7 +17,7 @@ export function EnquadrarMapa({ pontos }: { pontos: readonly PontoDoMapa[] }) {
     if (!limites) return
     // Folga para a altura do pino (41 px) e para o rótulo dele.
     mapa.fitBounds(limites, {
-      paddingTopLeft: [64, 64],
+      paddingTopLeft: [64, 88],
       paddingBottomRight: [64, 28],
       maxZoom: 15,
       animate: false,

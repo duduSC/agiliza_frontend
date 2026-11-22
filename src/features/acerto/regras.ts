@@ -43,3 +43,17 @@ export function diaFechadoNoRecibo(
   )
   return linha?.finalizadaEm ? diaDe(linha.finalizadaEm) : null
 }
+
+/**
+ * Total do servidor para exibir. O backend soma so os valores definidos: se todos os de uma
+ * situacao forem nulos, o total vem 0, que pareceria definitivo (Constituicao, Artigo 5.1).
+ * Nada e somado aqui; so se decide entre mostrar o numero do servidor e "—".
+ */
+export function totalParaExibir(
+  total: number,
+  situacao: LinhaExtratoResponse['situacao'],
+  linhas: readonly LinhaExtratoResponse[],
+): { valor: number | null; parcial: boolean } {
+  const parcial = linhas.some((l) => l.situacao === situacao && l.valorRepasse == null)
+  return { valor: parcial && total === 0 ? null : total, parcial }
+}

@@ -150,7 +150,7 @@ export function CaixaPagina() {
             </Badge>
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-5">
             <div>
               <dt className="text-muted-foreground">Data</dt>
               <dd className="font-medium">{formatarData(caixa.dataReferencia)}</dd>

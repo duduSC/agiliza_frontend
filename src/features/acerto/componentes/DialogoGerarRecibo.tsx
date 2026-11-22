@@ -7,6 +7,7 @@
 import type { ExtratoAcertoResponse } from '@/shared/api/schemas'
 import { useGerarRecibo } from '../api/hooks'
 import { formatarMoeda } from '@/shared/formatacao'
+import { totalParaExibir } from '../regras'
 import { ehErroApi } from '@/shared/api/erros'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -93,7 +94,7 @@ export function DialogoGerarRecibo({ extrato, atualizando, erroAoAtualizar, moto
               </ul>
             )}
             <p className="mt-2 border-t pt-2 text-sm font-semibold">
-              {valorIndefinido ? 'Total parcial' : 'Total do recibo'}: {formatarMoeda(extrato?.totalDevido)}
+              {valorIndefinido ? 'Total parcial' : 'Total do recibo'}: {formatarMoeda(extrato && totalParaExibir(extrato.totalDevido, 'A_ACERTAR', extrato.linhas).valor)}
             </p>
           </div>
 

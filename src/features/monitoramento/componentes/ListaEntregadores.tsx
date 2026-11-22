@@ -15,7 +15,7 @@ type Props = {
 }
 
 function badgeVariante(status: string, desatualizado: boolean): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (desatualizado) return 'destructive'
+  if (desatualizado) return 'outline'
   if (status === 'EM_ROTA') return 'default'
   return 'secondary'
 }

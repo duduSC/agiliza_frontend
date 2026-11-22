@@ -92,7 +92,7 @@ export function TabelaExtrato({ linhas, aoSelecionarEntrega, caixaDaLinha = () =
                   caixaDaLinha(linha) === 'ABERTO' && (
                     <Button
                       type="button"
-                      variant="link"
+                      variant="outline"
                       size="sm"
                       onClick={() => aoSelecionarEntrega(linha.entregaId)}
                     >

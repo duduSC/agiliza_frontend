@@ -328,3 +328,23 @@ describe('caixa', () => {
     expect(envios.total).toBe(1)
   })
 })
+
+describe('total sem valor definido nunca parece R$ 0,00 (5.1)', () => {
+  it('em revisão só com valor nulo mostra "—"', async () => {
+    await filtrar()
+    await extratoNaTela()
+    const cartao = screen.getByText(/^Em revisão/, { selector: 'p' }).parentElement!
+    expect(cartao).toHaveTextContent('—')
+    expect(cartao).not.toHaveTextContent('R$')
+  })
+
+  it('total devido e prévia do recibo só com valor nulo mostram "—"', async () => {
+    dbAcerto.atualizarFinalizada(IDS_ACERTO.entregaSemRecibo, { valorRepasse: null, foraDeArea: true })
+    await filtrar()
+    const cartao = (await screen.findByText(/^Total devido/, undefined, ESPERA)).parentElement!
+    expect(cartao).not.toHaveTextContent('R$')
+    await abrirGerarRecibo()
+    await waitFor(() => expect(screen.getByRole('dialog')).not.toHaveTextContent('R$ 0,00'), ESPERA)
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/R\$\s0,00/)
+  })
+})
