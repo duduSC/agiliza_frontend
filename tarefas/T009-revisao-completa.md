@@ -1,6 +1,6 @@
 # T009 — Revisão completa do Backoffice: contrato real, erros, telas e refinamento
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** F7 (refinamento)
 **Depende de:** T008 (CONCLUIDA)
 **Referências no DVP:** UC01, UC03 a UC07, HU01 a HU13, 1.4.4 (máquina de estados), RNF02 (painel em até 5 s), RNF06 (tempo real)
