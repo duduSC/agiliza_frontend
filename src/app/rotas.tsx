@@ -5,7 +5,7 @@
  * T007: /login fora do ExigirSessao; rotas protegidas redirecionam para /login sem sessao.
  * T008: /inicio e o destino de / e de rotas desconhecidas.
  */
-import type { ReactNode } from 'react'
+import { lazy, type ReactNode } from 'react'
 import type { RouteObject } from 'react-router-dom'
 import {
   AcessoNegadoPagina,
@@ -16,9 +16,6 @@ import {
   LoginPagina,
   RedirecionarParaInicio,
 } from '@/features/auth'
-import { AcertoPagina } from '@/features/acerto'
-import { CaixaPagina } from '@/features/caixa'
-import { DespachoPagina } from '@/features/despacho'
 import { InicioPagina } from '@/features/inicio'
 import {
   EntregadoresPagina,
@@ -26,10 +23,20 @@ import {
   IntegracaoPagina,
   ParametrosLojaPagina,
 } from '@/features/loja'
-import { MonitoramentoPagina } from '@/features/monitoramento'
 import { RestaurantesPagina } from '@/features/restaurantes'
 import { CAMINHO_INICIO, obterTela, type ChaveTela } from '@/shared/dominio'
+import { LimiteDeErro } from '@/shared/ui/LimiteDeErro'
 import { LayoutApp } from './LayoutApp'
+
+// Telas pesadas (mapas, acerto) carregam por rota; o `Suspense` fica no LayoutApp.
+const DespachoPagina = lazy(() =>
+  import('@/features/despacho').then((m) => ({ default: m.DespachoPagina })),
+)
+const MonitoramentoPagina = lazy(() =>
+  import('@/features/monitoramento').then((m) => ({ default: m.MonitoramentoPagina })),
+)
+const AcertoPagina = lazy(() => import('@/features/acerto').then((m) => ({ default: m.AcertoPagina })))
+const CaixaPagina = lazy(() => import('@/features/caixa').then((m) => ({ default: m.CaixaPagina })))
 
 const PAGINAS: Record<ChaveTela, ReactNode> = {
   restaurantes: <RestaurantesPagina />,
@@ -51,7 +58,14 @@ export function criarRotas(): RouteObject[] {
 
   return [
     // Login fica FORA do ExigirSessao (T007)
-    { path: CAMINHO_LOGIN, element: <LoginPagina /> },
+    {
+      path: CAMINHO_LOGIN,
+      element: (
+        <LimiteDeErro mensagem="Não foi possível exibir esta tela.">
+          <LoginPagina />
+        </LimiteDeErro>
+      ),
+    },
     {
       path: '/',
       element: (

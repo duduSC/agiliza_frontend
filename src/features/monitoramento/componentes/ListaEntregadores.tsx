@@ -39,7 +39,7 @@ export function ListaEntregadores({ entregadores, agora }: Props) {
               <span className="text-xs text-muted-foreground">
                 {entregador.placaVeiculo ?? 'Sem placa'}
                 {' — '}
-                Ultima posicao: {formatarHora(entregador.ultimaPosicaoEm)}
+                Última posição: {formatarHora(entregador.ultimaPosicaoEm)}
               </span>
             </div>
 
@@ -48,7 +48,7 @@ export function ListaEntregadores({ entregadores, agora }: Props) {
                 <span
                   className="flex items-center gap-1 text-xs text-amber-700"
                   role="alert"
-                  title="Posicao desatualizada: sem transmitir ha mais de 3 minutos"
+                  title="Posição desatualizada: sem transmitir há mais de 3 minutos"
                 >
                   <AlertTriangle className="size-3.5" aria-hidden="true" />
                   <span>Desatualizada</span>

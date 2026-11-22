@@ -12,12 +12,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import type { EntregaResponse } from '@/shared/api'
+import { ehErroApi, type EntregaResponse } from '@/shared/api'
 import { LABEL_MOTIVO_REVISAO, LABEL_STATUS_ENTREGA } from '@/shared/dominio'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useAjustarCoordenada, useEntregasEmRevisao } from '../api/hooks'
 import {
   coordenadaFormSchema,
@@ -34,7 +36,7 @@ export function ListaRevisao() {
 
   let estado: EstadoTela
   if (consulta.isPending) estado = { tipo: 'carregando' }
-  else if (consulta.isError)
+  else if (consulta.data === undefined)
     estado = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -64,6 +66,7 @@ export function ListaRevisao() {
           </span>
         )}
       </h2>
+      <AvisoDesatualizado consulta={consulta} />
       <ConteudoPorEstado estado={estado} />
     </section>
   )
@@ -86,7 +89,7 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
           Revisão: {motivo}
         </Badge>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <div>
           <dt className="text-muted-foreground">Status</dt>
           <dd>{LABEL_STATUS_ENTREGA[entrega.status]}</dd>
@@ -106,7 +109,7 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
       </dl>
       {entrega.motivoRevisao === 'CONTESTACAO_ENTREGADOR' && (
         <p className="text-sm text-muted-foreground">
-          O entregador contestou o valor. A análise é feita na tela de acerto.
+          O entregador contestou o valor. A entrega fica fora do recibo até a revisão ser resolvida.
         </p>
       )}
       {podeAjustarCoordenada(entrega) && <FormularioCoordenada entrega={entrega} />}
@@ -122,9 +125,11 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
 function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
   const ajustar = useAjustarCoordenada()
   const [erroServidor, setErroServidor] = useState<string | null>(null)
+  const envioUnico = useEnvioUnico()
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<CoordenadaForm>({
     resolver: zodResolver(coordenadaFormSchema),
@@ -132,14 +137,20 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
   })
 
   const enviar = handleSubmit(async (valores) => {
-    if (ajustar.isPending) return
-    setErroServidor(null)
-    try {
-      await ajustar.mutateAsync({ id: entrega.id, coordenada: paraAjustarCoordenadaRequest(valores) })
-      toast.success(`Coordenada de ${entrega.nomeCliente} enviada. A distância é recalculada pelo sistema.`)
-    } catch (erro) {
-      setErroServidor(mensagemDoErro(erro))
-    }
+    await envioUnico(async () => {
+      setErroServidor(null)
+      try {
+        await ajustar.mutateAsync({ id: entrega.id, coordenada: paraAjustarCoordenadaRequest(valores) })
+        toast.success(`Coordenada de ${entrega.nomeCliente} enviada. A distância é recalculada pelo sistema.`)
+      } catch (erro) {
+        if (ehErroApi(erro)) {
+          for (const { campo, mensagem } of erro.campos) {
+            if (campo === 'latitude' || campo === 'longitude') setError(campo, { message: mensagem })
+          }
+        }
+        setErroServidor(mensagemDoErro(erro))
+      }
+    })
   })
 
   return (
@@ -147,7 +158,7 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
       onSubmit={enviar}
       noValidate
       aria-label={`Ajustar coordenada: entrega de ${entrega.nomeCliente}`}
-      className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start"
+      className="grid grid-cols-2 items-start gap-3"
     >
       <CampoTexto
         rotulo="Latitude"
@@ -163,11 +174,11 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
         erro={errors.longitude?.message}
         {...register('longitude')}
       />
-      <Button type="submit" className="sm:mt-6" disabled={ajustar.isPending}>
+      <Button type="submit" className="col-span-2" disabled={ajustar.isPending}>
         {ajustar.isPending ? 'Salvando…' : 'Salvar coordenada'}
       </Button>
       {erroServidor && (
-        <p role="alert" className="text-sm text-destructive sm:col-span-3">
+        <p role="alert" className="text-sm text-destructive col-span-2">
           {erroServidor}
         </p>
       )}

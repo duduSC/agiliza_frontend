@@ -5,9 +5,11 @@
  */
 import { toast } from 'sonner'
 import type { EntregaResponse } from '@/shared/api'
-import { formatarKm, formatarMoeda } from '@/shared/formatacao'
+import { formatarKm, formatarMoeda, VALOR_INDEFINIDO } from '@/shared/formatacao'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Button } from '@/shared/ui/button'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import {
   Table,
   TableBody,
@@ -34,7 +36,7 @@ export function ListaPendentes() {
 
   let estado: EstadoTela
   if (consulta.isPending) estado = { tipo: 'carregando' }
-  else if (consulta.isError)
+  else if (consulta.data === undefined)
     estado = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -58,6 +60,7 @@ export function ListaPendentes() {
           </span>
         )}
       </h2>
+      <AvisoDesatualizado consulta={consulta} />
       <ConteudoPorEstado estado={estado} />
     </section>
   )
@@ -69,16 +72,16 @@ function TabelaPendentes({ entregas, agora }: { entregas: EntregaResponse[]; ago
       <TableHeader>
         <TableRow>
           <TableHead className="w-10">
-            <span className="sr-only">Selecao</span>
+            <span className="sr-only">Seleção</span>
           </TableHead>
           <TableHead>Cliente</TableHead>
           <TableHead>Bairro</TableHead>
-          <TableHead>Distancia</TableHead>
+          <TableHead>Distância</TableHead>
           <TableHead>Repasse</TableHead>
           <TableHead>Pagamento</TableHead>
           <TableHead>Espera</TableHead>
           <TableHead>
-            <span className="sr-only">Acoes</span>
+            <span className="sr-only">Ações</span>
           </TableHead>
         </TableRow>
       </TableHeader>
@@ -93,17 +96,20 @@ function TabelaPendentes({ entregas, agora }: { entregas: EntregaResponse[]; ago
 
 function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Date }) {
   const marcar = useMarcarPronto()
+  const envioUnico = useEnvioUnico()
   const estaSelecionada = useSelecaoStore((s) => s.selecionadas.has(entrega.id))
   const alternarSelecao = useSelecaoStore((s) => s.alternarSelecao)
   const maxPedidosPorLote = useSelecaoStore((s) => s.maxPedidosPorLote)
 
-  const aoMarcarPronto = () => {
-    if (marcar.isPending) return
-    marcar.mutate(entrega.id, {
-      onSuccess: () => toast.success(`Entrega de ${entrega.nomeCliente} marcada como pronta.`),
-      onError: (erro) => toast.error(mensagemDoErro(erro)),
+  const aoMarcarPronto = () =>
+    void envioUnico(async () => {
+      try {
+        await marcar.mutateAsync(entrega.id)
+        toast.success(`Entrega de ${entrega.nomeCliente} marcada como pronta.`)
+      } catch (erro) {
+        toast.error(mensagemDoErro(erro))
+      }
     })
-  }
 
   const aoAlternar = () => {
     const sucesso = alternarSelecao(entrega.id)
@@ -128,21 +134,21 @@ function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Da
           aria-label={`Selecionar entrega de ${entrega.nomeCliente}`}
         />
       </TableCell>
-      <TableCell className="font-medium">{entrega.nomeCliente}</TableCell>
-      <TableCell>{entrega.bairro ?? '--'}</TableCell>
+      <TableCell className="max-w-48 font-medium whitespace-normal">{entrega.nomeCliente}</TableCell>
+      <TableCell className="max-w-40 whitespace-normal">{entrega.bairro ?? VALOR_INDEFINIDO}</TableCell>
       <TableCell>{formatarKm(entrega.distanciaKm)}</TableCell>
       <TableCell>
         <span
-          title={entrega.valorRepasse == null ? 'Repasse ainda nao calculado' : 'Repasse provisorio'}
+          title={entrega.valorRepasse == null ? 'Repasse ainda não calculado' : 'Repasse provisório'}
         >
           {formatarMoeda(entrega.valorRepasse)}
         </span>
       </TableCell>
       <TableCell>
         <div>{descreverFormaPagamento(entrega)}</div>
-        <div className="text-xs text-muted-foreground">{descreverCobranca(entrega)}</div>
+        <div className="max-w-52 text-xs whitespace-normal text-muted-foreground">{descreverCobranca(entrega)}</div>
       </TableCell>
-      <TableCell>{descreverEspera(entrega.prontoParaDespachoEm, agora)}</TableCell>
+      <TableCell className="max-w-36 whitespace-normal">{descreverEspera(entrega.prontoParaDespachoEm, agora)}</TableCell>
       <TableCell>
         <div className="flex flex-wrap justify-end gap-2">
           {podeMarcarPronto(entrega) && (
@@ -153,7 +159,7 @@ function LinhaPendente({ entrega, agora }: { entrega: EntregaResponse; agora: Da
               disabled={marcar.isPending}
               aria-label={`Marcar pronto: entrega de ${entrega.nomeCliente}`}
             >
-              {marcar.isPending ? 'Marcando...' : 'Marcar pronto'}
+              {marcar.isPending ? 'Marcando…' : 'Marcar pronto'}
             </Button>
           )}
           {podeCancelar(entrega) && <BotaoCancelarEntrega entrega={entrega} />}

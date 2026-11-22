@@ -2,6 +2,8 @@
  * Utilitarios do monitoramento (T005).
  */
 
+import { instanteDeLocalDateTime } from '@/shared/formatacao'
+
 const LIMITE_DESATUALIZADO_MS = 3 * 60 * 1000 // 3 minutos
 
 /**
@@ -10,6 +12,7 @@ const LIMITE_DESATUALIZADO_MS = 3 * 60 * 1000 // 3 minutos
  */
 export function posicaoDesatualizada(ultimaPosicaoEm: string | null | undefined, agora: Date): boolean {
   if (!ultimaPosicaoEm) return true
-  const posicaoDate = new Date(ultimaPosicaoEm)
+  // LocalDateTime vem sem fuso: e horario de Sao Paulo, nao o da maquina (AGENT.md 6.6).
+  const posicaoDate = instanteDeLocalDateTime(ultimaPosicaoEm)
   return agora.getTime() - posicaoDate.getTime() > LIMITE_DESATUALIZADO_MS
 }

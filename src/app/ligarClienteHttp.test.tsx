@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { z } from 'zod'
 import { useSessaoStore } from '@/features/auth'
 import { requisitar } from '@/shared/api/client'
@@ -56,5 +56,31 @@ describe('cliente HTTP ligado a sessao', () => {
 
     await waitFor(() => expect(local.pathname).toBe('/acesso-negado'))
     expect(useSessaoStore.getState().usuario).not.toBeNull()
+  })
+})
+
+// T009: sem StrictMode (build de producao), os efeitos da pagina rodam antes dos do App.
+describe('token desde a primeira requisicao de cada tela', () => {
+  it('abrir e trocar de tela nunca envia consulta sem Authorization nem provoca refresh', async () => {
+    const semToken: string[] = []
+    let refreshes = 0
+    server.use(
+      http.get('*/api/*', ({ request }) => {
+        if (!request.headers.get('Authorization')) semToken.push(new URL(request.url).pathname)
+        return undefined
+      }),
+      http.post('*/api/auth/refresh', () => {
+        refreshes++
+        return undefined
+      }),
+    )
+    entrarComo('OPERADOR', 'jwt-teste')
+    renderizarApp('/inicio')
+    await screen.findByText('Pizzaria Demo', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getAllByRole('link', { name: /Caixa/ })[0]!)
+    await screen.findAllByText('Aberto', undefined, { timeout: 5000 })
+
+    expect(semToken).toEqual([])
+    expect(refreshes).toBe(0)
   })
 })

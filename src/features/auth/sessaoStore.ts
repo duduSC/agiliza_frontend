@@ -9,9 +9,9 @@ import type { UsuarioAutenticadoResponse } from '@/shared/api/schemas'
 import { perfilAcessaBackoffice } from '@/shared/dominio'
 
 export const MENSAGEM_PERFIL_SEM_ACESSO =
-  'Este acesso e exclusivo do painel administrativo. Use o aplicativo do entregador.'
+  'Este acesso é exclusivo do painel administrativo. Use o aplicativo do entregador.'
 export const MENSAGEM_SEM_ESTABELECIMENTO =
-  'Usuario sem estabelecimento vinculado. Nao e possivel acessar o Backoffice.'
+  'Usuário sem estabelecimento vinculado. Não é possível acessar o Backoffice.'
 
 export type DadosInicioSessao = {
   usuario: UsuarioAutenticadoResponse

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { vi } from 'vitest'
 import { mapaFalso } from './mapaFalso'
 import { redefinirAcerto } from './msw/dadosAcerto'
@@ -37,6 +37,8 @@ vi.mock('react-leaflet', () => ({
       props.children,
     )
   },
+  Tooltip: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('span', { 'data-testid': 'rotulo-pino' }, children),
   Popup: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children),
 }))
@@ -83,6 +85,9 @@ function instalarAdaptadorDeSinal(): void {
     })
   }
 }
+
+// As rotas sao lazy: o primeiro render de uma tela inclui o import dela.
+configure({ asyncUtilTimeout: 10_000 })
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' })

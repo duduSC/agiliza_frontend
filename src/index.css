@@ -22,7 +22,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.5 0.19 260);
 }
 
 .dark {
@@ -77,5 +77,14 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Foco visível no projetor (Constituição, Artigo 7.6). */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  .leaflet-marker-icon:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }

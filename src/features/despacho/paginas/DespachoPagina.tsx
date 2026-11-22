@@ -5,16 +5,19 @@
 import { useEffect } from 'react'
 import { useEstabelecimentoAtual } from '@/features/loja'
 import { useTempoRealDespacho } from '@/shared/realtime'
+import { IndicadorTempoReal } from '@/shared/realtime/IndicadorTempoReal'
+import { EstadoErro } from '@/shared/ui/estados'
 import { LimiteDeErro } from '@/shared/ui/LimiteDeErro'
 import { AlertaIntegracao } from '../componentes/AlertaIntegracao'
 import { BarraSelecao } from '../componentes/BarraSelecao'
 import { BotaoNovaEntregaAvulsa } from '../componentes/FormularioEntregaAvulsa'
-import { IndicadorTempoReal } from '../componentes/IndicadorTempoReal'
 import { ListaLotesDespachados } from '../componentes/ListaLotesDespachados'
 import { ListaPendentes } from '../componentes/ListaPendentes'
 import { ListaRevisao } from '../componentes/ListaRevisao'
 import { MapaDespacho } from '../componentes/MapaDespacho'
+import { useEntregasPendentes } from '../api/hooks'
 import { useSelecaoStore } from '../selecaoStore'
+import { mensagemDoErro } from '../util'
 
 export function DespachoPagina() {
   // Conectar STOMP (T004)
@@ -35,15 +38,22 @@ export function DespachoPagina() {
     if (maxPedidosPorLote != null && maxPedidosPorLote > 0) definirLimite(maxPedidosPorLote)
   }, [maxPedidosPorLote, definirLimite])
 
+  // Quem saiu da lista (despachada por outro, cancelada, em revisao) sai da selecao.
+  const { data: pendentes } = useEntregasPendentes()
+  const manterApenas = useSelecaoStore((s) => s.manterApenas)
+  useEffect(() => {
+    if (pendentes) manterApenas(pendentes.map((e) => e.id))
+  }, [pendentes, manterApenas])
+
   return (
-    <section aria-labelledby="titulo-pagina" className="flex flex-col gap-6">
+    <section aria-labelledby="titulo-pagina" className="flex flex-col gap-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 id="titulo-pagina" className="text-xl font-semibold">
             Despacho
           </h1>
           <p className="text-sm text-muted-foreground">
-            Entregas aguardando despacho e entregas em revisao.
+            Entregas aguardando despacho e entregas em revisão.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -55,19 +65,25 @@ export function DespachoPagina() {
       <AlertaIntegracao />
       <BarraSelecao />
 
-      {/* Mapa + listas lado a lado em telas grandes */}
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-6">
-          <LimiteDeErro mensagem="Nao foi possivel exibir o mapa. As entregas continuam na lista abaixo.">
-            <MapaDespacho coordenadaLoja={loja.data?.coordenada ?? null} />
-          </LimiteDeErro>
-          <ListaPendentes />
-        </div>
-        <div className="flex flex-col gap-6">
-          <ListaRevisao />
+      {loja.isError && (
+        <EstadoErro
+          mensagem={`${mensagemDoErro(loja.error)} O mapa segue sem o pino da loja.`}
+          aoTentarNovamente={() => void loja.refetch()}
+        />
+      )}
+
+      {/* Mapa com revisao e lotes ao lado; a tabela usa a largura inteira (projetor 1366 px). */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <LimiteDeErro mensagem="Não foi possível exibir o mapa. As entregas continuam na lista abaixo.">
+          <MapaDespacho coordenadaLoja={loja.data?.coordenada ?? null} />
+        </LimiteDeErro>
+        <div className="flex flex-col gap-4 lg:h-[50vh] lg:min-h-[320px] lg:overflow-y-auto lg:pr-1">
           <ListaLotesDespachados />
+          <ListaRevisao />
         </div>
       </div>
+
+      <ListaPendentes />
     </section>
   )
 }
