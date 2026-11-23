@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { vi } from 'vitest'
 import { useFiltroAcertoStore } from '@/features/acerto/filtroStore'
 import { useSelecaoStore } from '@/features/despacho/selecaoStore'
+import { useFiltroRelatorioStore } from '@/features/relatorio/filtroStore'
 import { mapaFalso } from './mapaFalso'
 import { redefinirAcerto } from './msw/dadosAcerto'
 import { redefinirEntregas } from './msw/dadosEntregas'
@@ -121,5 +122,6 @@ afterEach(() => {
   // Estado de tela guardado entre abas (T010): cada teste começa sem o do anterior.
   useFiltroAcertoStore.getState().limpar()
   useSelecaoStore.getState().limparSelecao()
+  useFiltroRelatorioStore.getState().limpar()
 })
 afterAll(() => server.close())

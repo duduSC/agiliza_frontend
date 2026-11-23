@@ -73,6 +73,11 @@ export const ENDPOINTS = {
     configuracao: '/api/integracoes', // Confirmado (S010) — GET devolve lista / PUT
     falhas: '/api/falhas-integracao', // Confirmado (S010) — GET ?status= (padrao PENDENTE)
   },
+  relatorios: {
+    // PROVISÓRIO (T010): contrato da D013. DTO conferido no worktree .t015 do backend (099c91a,
+    // RelatorioDoDiaResponse): bate campo a campo. Ainda não está em develop do backend.
+    dia: '/api/relatorios/dia', // GET ?data=AAAA-MM-DD (sem data, hoje em Sao Paulo)
+  },
   estabelecimentos: {
     listar: '/api/estabelecimentos', // Confirmado (S010) — ADMIN_GERAL
     criar: '/api/estabelecimentos', // Confirmado (S010) — POST 201, com administrador aninhado

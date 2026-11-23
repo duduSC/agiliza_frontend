@@ -37,6 +37,9 @@ const MonitoramentoPagina = lazy(() =>
 )
 const AcertoPagina = lazy(() => import('@/features/acerto').then((m) => ({ default: m.AcertoPagina })))
 const CaixaPagina = lazy(() => import('@/features/caixa').then((m) => ({ default: m.CaixaPagina })))
+const RelatorioPagina = lazy(() =>
+  import('@/features/relatorio').then((m) => ({ default: m.RelatorioPagina })),
+)
 
 const PAGINAS: Record<ChaveTela, ReactNode> = {
   restaurantes: <RestaurantesPagina />,
@@ -48,6 +51,7 @@ const PAGINAS: Record<ChaveTela, ReactNode> = {
   monitoramento: <MonitoramentoPagina />,
   acerto: <AcertoPagina />,
   caixa: <CaixaPagina />,
+  relatorio: <RelatorioPagina />,
 }
 
 export function criarRotas(): RouteObject[] {
