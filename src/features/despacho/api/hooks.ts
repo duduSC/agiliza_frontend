@@ -18,6 +18,8 @@ import {
   listarEmRevisao,
   listarPendentesDeDespacho,
   marcarPronto,
+  resolverRevisao,
+  type ResolverRevisaoRequest,
 } from './entregasApi'
 import { contarFalhasPendentes } from './falhasApi'
 import { despacharLote, devolverLote, listarLotesDespachados, type DespacharLoteRequest } from './lotesApi'
@@ -165,5 +167,26 @@ export function useDevolverLote() {
   return useMutation({
     mutationFn: (id: string) => devolverLote(id),
     onSettled: () => invalidar(),
+  })
+}
+
+/**
+ * Analisar contestação (T010). Ao resolver, a entrega volta a contar no acerto: invalida também
+ * acerto, recibos e caixa pelo prefixo (sem importar os módulos, para não criar ciclo).
+ * Move dinheiro quando ajusta: sem otimismo (Constituição, Artigo 5.8).
+ */
+export function useResolverRevisao() {
+  const invalidar = useInvalidarDespacho()
+  const queryClient = useQueryClient()
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useMutation({
+    mutationFn: ({ id, corpo }: { id: string; corpo: ResolverRevisaoRequest }) => resolverRevisao(id, corpo),
+    onSettled: () =>
+      Promise.all([
+        invalidar(),
+        queryClient.invalidateQueries({ queryKey: ['acerto', estabelecimentoId] }),
+        queryClient.invalidateQueries({ queryKey: ['recibos', estabelecimentoId] }),
+        queryClient.invalidateQueries({ queryKey: ['caixa', estabelecimentoId] }),
+      ]),
   })
 }

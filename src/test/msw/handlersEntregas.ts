@@ -5,11 +5,15 @@
  * estado para verificar comportamentos especificos.
  */
 import { http, HttpResponse } from 'msw'
+import { formatInTimeZone } from 'date-fns-tz'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import type { EntregaResponse } from '@/shared/api/schemas'
 import { criarEntregaResponse } from '@/test/fabricas'
+import { dbAcerto } from './dadosAcerto'
 import { dbEntregas } from './dadosEntregas'
 import { erroApi, naoEncontrado, regraViolada } from './respostas'
+
+const ESTADOS_FINAIS: readonly EntregaResponse['status'][] = ['ENTREGUE', 'FALHA', 'CANCELADA']
 
 export const handlersEntregas = [
   /**
@@ -121,7 +125,7 @@ export const handlersEntregas = [
     return HttpResponse.json(atualizada)
   }),
 
-  /** PATCH /api/entregas/:id/coordenada — ajustar pino (revisao SEM_COORDENADA). */
+  /** PATCH /api/entregas/:id/coordenada — reposicionar pino (SEM_COORDENADA e SEM_DISTANCIA; T010). */
   http.patch('*/api/entregas/:id/coordenada', async ({ params, request }) => {
     const id = params.id as string
     const entrega = dbEntregas.buscar(id)
@@ -140,13 +144,84 @@ export const handlersEntregas = [
       ])
     }
 
+    // Como `EntregaServiceImpl.exigirReposicionavel`: estado final nao se reposiciona.
+    if (ESTADOS_FINAIS.includes(entrega.status)) {
+      return regraViolada(request, 'REGRA_NEGOCIO_VIOLADA', 'Não é possível reposicionar uma entrega já finalizada.')
+    }
+
+    // Como `limparRevisaoDeLocalizacao`: o pino nao resolve a contestacao do entregador.
+    const contestada = entrega.motivoRevisao === 'CONTESTACAO_ENTREGADOR'
     const atualizada = dbEntregas.atualizar(id, {
       coordenada: { latitude, longitude },
-      pendenteRevisao: false,
-      motivoRevisao: null,
+      pendenteRevisao: contestada,
+      motivoRevisao: contestada ? 'CONTESTACAO_ENTREGADOR' : null,
       distanciaKm: 3.5, // Valor de exemplo — recalculado pelo backend
       valorRepasse: 9.5, // Valor de exemplo — recalculado pelo backend
       atualizadoEm: '2026-11-11T12:10:00',
+    })
+    return HttpResponse.json(atualizada)
+  }),
+
+  /**
+   * POST /api/entregas/:id/revisao/resolver — analise da contestacao (T010). Mesmas recusas e na
+   * mesma ordem de `EntregaServiceImpl.resolverRevisao`, `AjusteRepasse` e `PoliticaCorrecao`
+   * (develop 8c02b47).
+   */
+  http.post('*/api/entregas/:id/revisao/resolver', async ({ params, request }) => {
+    const corpo = (await request.json()) as { valorRepasse?: number | null; motivo?: string }
+    if (!corpo.motivo?.trim()) {
+      return erroApi(request, 400, 'DADOS_INVALIDOS', 'Um ou mais campos contêm valores inválidos.', [
+        { campo: 'motivo', mensagem: 'não deve estar em branco' },
+      ])
+    }
+    const entrega = dbEntregas.buscar(params.id as string)
+    if (!entrega) return naoEncontrado(request)
+    if (!entrega.pendenteRevisao) {
+      return regraViolada(request, 'REGRA_NEGOCIO_VIOLADA', 'A entrega não possui revisão pendente.')
+    }
+    if (entrega.motivoRevisao !== 'CONTESTACAO_ENTREGADOR') {
+      return regraViolada(
+        request,
+        'REGRA_NEGOCIO_VIOLADA',
+        'Pendências de localização são resolvidas reposicionando o pino da entrega.',
+      )
+    }
+
+    const dia = entrega.finalizadaEm
+      ? entrega.finalizadaEm.slice(0, 10)
+      : formatInTimeZone(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd')
+    const caixa = dbAcerto.caixas().find((c) => c.dataReferencia === dia)
+    const caixaFechado = (operacao: string) =>
+      regraViolada(
+        request,
+        'CAIXA_FECHADO',
+        `Operação '${operacao}' não permitida: o caixa do período de operação já está fechado.`,
+      )
+    const recusarAjuste = (motivo: string) =>
+      regraViolada(request, 'AJUSTE_VALOR_NAO_PERMITIDO', `Ajuste manual de repasse não permitido: ${motivo}.`)
+
+    const valor = corpo.valorRepasse ?? null
+    const ajusta = valor !== null && (entrega.valorRepasse == null || valor !== entrega.valorRepasse)
+    if (ajusta) {
+      if (!ESTADOS_FINAIS.includes(entrega.status)) {
+        return recusarAjuste('a entrega ainda não foi finalizada; o valor dela é provisório até lá')
+      }
+      if (entrega.reciboId) {
+        return recusarAjuste(
+          `a entrega está vinculada ao recibo '${entrega.reciboId}'; cancele o recibo antes de ajustar o valor e gere um novo acerto em seguida`,
+        )
+      }
+      if (!caixa) return recusarAjuste('não há caixa aberto para o dia da entrega')
+      if (caixa.status === 'FECHADO') return caixaFechado('ajustar o valor de repasse')
+    } else if (!caixa || caixa.status === 'FECHADO') {
+      return caixaFechado('resolver a revisão da entrega')
+    }
+
+    const atualizada = dbEntregas.atualizar(entrega.id, {
+      pendenteRevisao: false,
+      motivoRevisao: null,
+      ...(ajusta ? { valorRepasse: valor } : {}),
+      atualizadoEm: '2026-11-11T12:20:00',
     })
     return HttpResponse.json(atualizada)
   }),

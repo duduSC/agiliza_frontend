@@ -6,7 +6,8 @@
  * - Entrega sem coordenada (revisao SEM_COORDENADA) NAO aparece no mapa (HU01).
  * - Clicar no pino seleciona/desseleciona a entrega.
  * - Popup com resumo (cliente, bairro, distancia, repasse ou "--").
- * - Pino arrastavel para entregas em revisao SEM_COORDENADA (UC01 A1).
+ * - Pino arrastavel para entregas em revisao de localizacao com coordenada: SEM_DISTANCIA e
+ *   SEM_COORDENADA ja posicionada (UC01 A1, R04; T010).
  * - Enquadra a loja e todos os pinos; rotulo de texto alem da cor (T009).
  */
 import { useCallback, useMemo, useState } from 'react'
@@ -16,7 +17,9 @@ import { toast } from 'sonner'
 import type { EntregaResponse } from '@/shared/api'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
 import { useAjustarCoordenada, useEntregasPendentes, useEntregasEmRevisao } from '../api/hooks'
+import { avisarResultadoDoPino } from '../avisos'
 import { centroDoMapa, type CoordenadaLoja } from '../mapa'
+import { podeAjustarCoordenada } from '../regras'
 import { EnquadrarMapa } from '@/shared/ui/mapa/EnquadrarMapa'
 import type { PontoDoMapa } from '@/shared/ui/mapa/enquadramento'
 import { PINO_AMBAR, PINO_AZUL, PINO_VERDE_GRANDE, PINO_VERMELHO } from '@/shared/ui/mapa/icones'
@@ -39,12 +42,9 @@ export function MapaDespacho({ coordenadaLoja }: Props) {
     [pendentes],
   )
 
-  // Entregas em revisao SEM_COORDENADA que ja receberam coordenada (arrastavel).
+  // Revisao de localizacao com coordenada (arrastavel): "Reposicionar pino" (T010).
   const revisaoComCoordenada = useMemo(
-    () =>
-      (revisao ?? []).filter(
-        (e) => e.motivoRevisao === 'SEM_COORDENADA' && e.coordenada != null,
-      ),
+    () => (revisao ?? []).filter((e) => podeAjustarCoordenada(e) && e.coordenada != null),
     [revisao],
   )
 
@@ -167,10 +167,7 @@ function PinoRevisaoArrastavel({ entrega }: { entrega: EntregaResponse }) {
       ajustar.mutate(
         { id: entrega.id, coordenada: { latitude: Number(pos.lat.toFixed(7)), longitude: Number(pos.lng.toFixed(7)) } },
         {
-          onSuccess: () =>
-            toast.success(
-              `Coordenada de ${entrega.nomeCliente} atualizada. A distância é recalculada pelo sistema.`,
-            ),
+          onSuccess: (atualizada) => avisarResultadoDoPino(atualizada),
           onError: (erro) => {
             setRecusas((n) => n + 1)
             toast.error(mensagemDoErro(erro))
@@ -178,7 +175,7 @@ function PinoRevisaoArrastavel({ entrega }: { entrega: EntregaResponse }) {
         },
       )
     },
-    [entrega.id, entrega.nomeCliente, ajustar],
+    [entrega.id, ajustar],
   )
 
   if (!entrega.coordenada) return null
@@ -195,7 +192,9 @@ function PinoRevisaoArrastavel({ entrega }: { entrega: EntregaResponse }) {
       <Popup>
         <div className="min-w-[160px] text-sm">
           <p className="font-semibold">{entrega.nomeCliente}</p>
-          <p className="text-amber-700">Revisão: sem coordenada</p>
+          <p className="text-amber-700">
+            Revisão: {entrega.motivoRevisao === 'SEM_DISTANCIA' ? 'distância não calculada' : 'sem coordenada'}
+          </p>
           <p className="text-xs">Arraste o pino para definir a posição</p>
         </div>
       </Popup>

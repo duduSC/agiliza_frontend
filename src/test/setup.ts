@@ -22,7 +22,7 @@ vi.mock('react-leaflet', () => ({
     position: [number, number]
     icon?: unknown
     title?: string
-    eventHandlers?: { click?: () => void }
+    eventHandlers?: { click?: () => void; dragend?: (evento: unknown) => void }
   }) => {
     // Reproduz o Leaflet real (T008): `icon` presente porem `undefined` sobrescreve o icone
     // padrao e o Leaflet quebra em `options.icon.createIcon()`.
@@ -34,7 +34,18 @@ vi.mock('react-leaflet', () => ({
     }
     return React.createElement(
       'div',
-      { 'data-testid': 'pino-mapa', title: props.title, onClick: props.eventHandlers?.click },
+      {
+        'data-testid': 'pino-mapa',
+        title: props.title,
+        onClick: props.eventHandlers?.click,
+        // Arrastar: o teste dispara `dragEnd` e o pino "cai" 0,001 grau ao norte e a leste.
+        onDragEnd: props.eventHandlers?.dragend
+          ? () =>
+              props.eventHandlers?.dragend?.({
+                target: { getLatLng: () => ({ lat: props.position[0] + 0.001, lng: props.position[1] + 0.001 }) },
+              })
+          : undefined,
+      },
       props.children,
     )
   },

@@ -80,3 +80,20 @@ export function ajustarCoordenada(
     schema: entregaResponseSchema,
   })
 }
+
+/**
+ * Resolução da contestação do entregador (UC08 A1, HU14; T010). Sem `valorRepasse` (ou com o
+ * valor atual), só tira a pendência; com valor diferente, o backend aplica o ajuste do UC03 A1.
+ * Corpo de `ResolverRevisaoRequest.java`: `valorRepasse` (opcional, >= 0, 2 casas) e `motivo`
+ * (obrigatório, até 100).
+ */
+export type ResolverRevisaoRequest = { valorRepasse?: number; motivo: string }
+
+export function resolverRevisao(id: string, corpo: ResolverRevisaoRequest): Promise<EntregaResponse> {
+  return requisitar({
+    metodo: 'POST',
+    caminho: ENDPOINTS.entregas.resolverRevisao(id),
+    corpo,
+    schema: entregaResponseSchema,
+  })
+}

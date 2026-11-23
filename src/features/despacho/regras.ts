@@ -29,15 +29,21 @@ export function podeCancelar(entrega: EntregaParaRegra): boolean {
 }
 
 /**
- * Ajuste manual de coordenada (sem mapa nesta fase): só para revisão `SEM_COORDENADA`
- * e quando a máquina de estados permite ajustar o pino (UC01 A1).
+ * "Reposicionar pino" (UC01 A1, R04; T010): revisão de localização (`SEM_COORDENADA` ou
+ * `SEM_DISTANCIA`) e status que a máquina de estados deixa ajustar o pino. O backend recalcula
+ * a distância e tira a entrega da revisão.
  */
 export function podeAjustarCoordenada(entrega: EntregaParaRegra): boolean {
   return (
     entrega.pendenteRevisao &&
-    entrega.motivoRevisao === 'SEM_COORDENADA' &&
+    (entrega.motivoRevisao === 'SEM_COORDENADA' || entrega.motivoRevisao === 'SEM_DISTANCIA') &&
     acoesPermitidas(entrega.status).includes('AJUSTAR_PINO')
   )
+}
+
+/** "Analisar contestação" (UC08 A1, HU14; T010): só para `CONTESTACAO_ENTREGADOR` pendente. */
+export function podeAnalisarContestacao(entrega: EntregaParaRegra): boolean {
+  return entrega.pendenteRevisao && entrega.motivoRevisao === 'CONTESTACAO_ENTREGADOR'
 }
 
 /** Minutos desde `prontoParaDespachoEm`; `null` se a entrega não foi marcada pronta (UC01 A5). */

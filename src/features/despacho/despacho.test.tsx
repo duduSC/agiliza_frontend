@@ -211,7 +211,7 @@ describe('lista de revisao', () => {
     expect(within(cartao2).getByText(/n.o calculada/i)).toBeInTheDocument()
 
     const cartao3 = screen.getByTestId(`revisao-${IDS_ENTREGAS.revisaoContestacao}`)
-    expect(within(cartao3).getByText(/contesta/i)).toBeInTheDocument()
+    expect(within(cartao3).getByText(/contestou o valor/i)).toBeInTheDocument()
     expect(within(cartao3).getByText(/fora do recibo/i)).toBeInTheDocument()
   })
 
