@@ -2,9 +2,11 @@
  * Estado de selecao de entregas para despacho (T004). Store Zustand local da feature,
  * nao global (Constituicao 5.6: limite maxPedidosPorLote).
  *
- * A selecao fica em memoria e e limpa ao despachar, ao navegar, ou ao trocar de sessao.
+ * A selecao fica em memoria e e limpa ao despachar ou ao trocar de sessao. Desde a T010 ela
+ * sobrevive a troca de aba; quem saiu da lista sai da selecao (`manterApenas`).
  */
 import { create } from 'zustand'
+import { aoTrocarDeSessao } from '@/features/auth'
 
 type EstadoSelecao = {
   selecionadas: ReadonlySet<string>
@@ -57,3 +59,6 @@ export const useSelecaoStore = create<EstadoSelecao>()((set, get) => ({
     return selecionadas.size >= maxPedidosPorLote
   },
 }))
+
+// A seleção sobrevive à troca de aba (T010), mas nunca à troca de sessão.
+aoTrocarDeSessao(() => useSelecaoStore.getState().limparSelecao())

@@ -91,3 +91,19 @@ export function obterTokenDaSessao(): string | null {
 export function obterRefreshTokenDaSessao(): string | null {
   return useSessaoStore.getState().refreshToken
 }
+
+/**
+ * Chama `limpar` quando o dono da sessão muda: saída, entrada de outro usuário ou outra loja
+ * (Constituição, Artigo 6.2; T010). Usado pelos estados de tela guardados em memória entre abas,
+ * para um filtro de uma sessão nunca aparecer na seguinte.
+ */
+export function aoTrocarDeSessao(limpar: () => void): () => void {
+  return useSessaoStore.subscribe((atual, anterior) => {
+    if (
+      atual.usuario?.usuarioId !== anterior.usuario?.usuarioId ||
+      atual.estabelecimentoId !== anterior.estabelecimentoId
+    ) {
+      limpar()
+    }
+  })
+}

@@ -23,11 +23,7 @@ export function DespachoPagina() {
   // Conectar STOMP (T004)
   useTempoRealDespacho()
 
-  // Limpar selecao quando o componente desmontar (navegar para outra pagina)
-  const limparSelecao = useSelecaoStore((s) => s.limparSelecao)
-  useEffect(() => {
-    return () => limparSelecao()
-  }, [limparSelecao])
+  // A selecao sobrevive a troca de aba (T010) e some na troca de sessao (`selecaoStore`).
 
   // Loja do token: centro do mapa e limite do lote (Constituicao 5.6). Enquanto nao chega,
   // vale o padrao 5 da store; o backend tem a palavra final (LIMITE_LOTE_EXCEDIDO).
