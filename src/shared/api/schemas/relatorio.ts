@@ -2,10 +2,11 @@ import { z } from 'zod'
 import { decimal, inteiro, localDate, opcional, uuid } from './comuns'
 
 /**
- * Relatório do dia (D013, decisão 5; T010). PROVISÓRIO: conferido com RelatorioDoDiaResponse do worktree
- * .t015 do backend (099c91a), idêntico ao contrato da D013; falta chegar a develop. Contrato definido na
- * D013, ainda sem o DTO em `develop` do backend (T015 em andamento). Valores monetários podem vir
- * `null` (repasse indefinido não entra como zero): por isso `opcional` neles.
+ * Relatório do dia (D013, decisão 5; T010). PROVISÓRIO até a T015 do backend chegar a `develop`:
+ * contrato da D013, conferido campo a campo com `RelatorioDoDiaResponse` e
+ * `RelatorioDoEntregadorResponse` do worktree `.t015` (commit 099c91a). Valores monetários podem
+ * vir `null` (repasse indefinido não entra como zero; `RelatorioServiceImpl.soma`): por isso
+ * `opcional` neles. As contagens são `int` primitivo no Java e nunca vêm nulas.
  */
 export const relatorioDoEntregadorResponseSchema = z.object({
   motoboyId: uuid,

@@ -7,6 +7,8 @@
  * - caixa do dia da entrega fechado ou inexistente: nada é oferecido (Constituição, Artigo 5.3).
  *   O dia é o de `finalizadaEm`; sem ele, o de hoje em São Paulo, como no backend;
  * - entrega em recibo: só "manter"; o ajuste pede cancelar o recibo antes (Artigo 5.2);
+ * - valor atual indefinido (`null`): a tela abre em "ajustar" e avisa que manter deixa o recibo do
+ *   período bloqueado (`ReciboServiceImpl` recusa entrega sem valor), sem esconder a opção;
  * - `CAIXA_FECHADO`, `AJUSTE_VALOR_NAO_PERMITIDO` e as demais recusas viram mensagem clara.
  * Sem atualização otimista (Artigo 5.8): a entrega só sai da revisão depois da resposta, e o valor
  * novo é o que o servidor devolve.
@@ -57,6 +59,8 @@ const MSG_CAIXA_FECHADO =
 const MSG_SEM_CAIXA = 'Não há caixa aberto para o dia desta entrega. Abra o caixa do dia antes de resolver.'
 const MSG_EM_RECIBO =
   'Esta entrega está em um recibo. Para ajustar o valor, cancele o recibo antes; ou mantenha o valor.'
+const MSG_VALOR_INDEFINIDO =
+  'O valor desta entrega ainda não foi definido. Manter deixa a entrega sem valor, e o recibo do entregador nesse período fica bloqueado até um ajuste.'
 
 export function BotaoAnalisarContestacao({ entrega }: { entrega: EntregaResponse }) {
   const [aberto, setAberto] = useState(false)
@@ -118,7 +122,9 @@ function DialogoAnalisarContestacao({
 }) {
   const situacaoCaixa = useSituacaoCaixa(entrega)
   const emRecibo = entrega.reciboId != null
-  const [decisao, setDecisao] = useState<Decisao>('MANTER')
+  const valorIndefinido = entrega.valorRepasse == null
+  // Sem valor, "manter" quase nunca é o que se quer: a tela já abre em "ajustar".
+  const [decisao, setDecisao] = useState<Decisao>(valorIndefinido && !emRecibo ? 'AJUSTAR' : 'MANTER')
   const [valorNovo, setValorNovo] = useState('')
   const [motivo, setMotivo] = useState('')
   const [erros, setErros] = useState<{ valorNovo?: string; motivo?: string }>({})
@@ -142,6 +148,9 @@ function DialogoAnalisarContestacao({
         valor = paraValorMonetarioBackend(Number(valorOk.data.replace(',', '.')))
         if (entrega.valorRepasse != null && valor === entrega.valorRepasse) {
           novosErros.valorNovo = 'Informe um valor diferente do atual, ou escolha manter o valor.'
+        } else if (entrega.valorRepasse == null && valor === 0) {
+          // `AjusteRepasse` trata o valor indefinido como zero e recusaria "igual ao atual".
+          novosErros.valorNovo = 'Com o valor atual indefinido, informe um valor maior que zero.'
         }
       }
     }
@@ -244,6 +253,11 @@ function DialogoAnalisarContestacao({
                   <p className="text-sm text-muted-foreground">
                     Esta entrega está no recibo #{entrega.reciboId?.slice(0, 8)}. Para ajustar o valor, cancele o
                     recibo primeiro.
+                  </p>
+                )}
+                {valorIndefinido && (
+                  <p data-testid="aviso-valor-indefinido" className="text-sm text-amber-900">
+                    {MSG_VALOR_INDEFINIDO}
                   </p>
                 )}
               </fieldset>

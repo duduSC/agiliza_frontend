@@ -213,6 +213,8 @@ export const handlersEntregas = [
       }
       if (!caixa) return recusarAjuste('não há caixa aberto para o dia da entrega')
       if (caixa.status === 'FECHADO') return caixaFechado('ajustar o valor de repasse')
+      // `AjusteRepasse`: o valor anterior nulo conta como zero.
+      if ((entrega.valorRepasse ?? 0) === valor) return recusarAjuste('o novo valor é igual ao valor atual')
     } else if (!caixa || caixa.status === 'FECHADO') {
       return caixaFechado('resolver a revisão da entrega')
     }

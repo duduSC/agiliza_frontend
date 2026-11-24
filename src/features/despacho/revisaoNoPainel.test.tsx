@@ -63,6 +63,33 @@ describe('analisar contestação (CONTESTACAO_ENTREGADOR)', () => {
     expect(valor).not.toHaveTextContent('R$')
   })
 
+  it('valor atual nulo: abre em "ajustar" e avisa que manter bloqueia o recibo do período', async () => {
+    dbEntregas.atualizar(IDS_ENTREGAS.revisaoContestacao, { valorRepasse: null })
+    const dialogo = await abrirAnalise()
+    expect(await within(dialogo).findByRole('radio', { name: /ajustar/i }, ESPERA)).toBeChecked()
+    expect(within(dialogo).getByRole('radio', { name: /manter/i })).toBeEnabled()
+    expect(within(dialogo).getByTestId('aviso-valor-indefinido')).toHaveTextContent(/recibo .* fica bloqueado/i)
+  })
+
+  it('valor atual nulo: ajustar para zero é recusado antes de enviar, como o backend faria', async () => {
+    dbEntregas.atualizar(IDS_ENTREGAS.revisaoContestacao, { valorRepasse: null })
+    const corpos = capturarCorpo('*/api/entregas/:id/revisao/resolver')
+    const dialogo = await abrirAnalise()
+    fireEvent.change(await within(dialogo).findByLabelText(/novo valor/i, undefined, ESPERA), {
+      target: { value: '0' },
+    })
+    fireEvent.change(within(dialogo).getByLabelText(/^Motivo/), { target: { value: 'x' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Confirmar análise' }))
+    expect(await within(dialogo).findByText(/informe um valor maior que zero/i)).toBeInTheDocument()
+    expect(corpos).toHaveLength(0)
+  })
+
+  it('valor atual definido: abre em "manter", sem o aviso de valor indefinido', async () => {
+    const dialogo = await abrirAnalise()
+    expect(await within(dialogo).findByRole('radio', { name: /manter/i }, ESPERA)).toBeChecked()
+    expect(within(dialogo).queryByTestId('aviso-valor-indefinido')).not.toBeInTheDocument()
+  })
+
   it('manter o valor exige motivo', async () => {
     const corpos = capturarCorpo('*/api/entregas/:id/revisao/resolver')
     const dialogo = await abrirAnalise()

@@ -185,6 +185,23 @@ describe('filtro por data', () => {
     expect(datas.length).toBe(antes)
   })
 
+  it('voltar ao relatório relê o servidor: o pago de agora, não o de antes', async () => {
+    // Os totais são do "servidor" (o mock): antes e depois de um recibo pago no Acerto.
+    let totais = { valorPago: 20, valorAPagar: 32.5 }
+    server.use(http.get('*/api/relatorios/dia', () => HttpResponse.json(relatorioDoDiaMock(totais))))
+    renderizarApp('/relatorio')
+    expect(await screen.findByTestId('cartao-valor-pago', undefined, ESPERA)).toHaveTextContent(/R\$\s*20,00/)
+
+    const menu = screen.getByRole('navigation', { name: 'Menu principal' })
+    fireEvent.click(within(menu).getByRole('link', { name: 'Caixa' }))
+    await screen.findByRole('heading', { name: 'Caixa', level: 1 }, ESPERA)
+    totais = { valorPago: 52.5, valorAPagar: 0 }
+    fireEvent.click(within(menu).getByRole('link', { name: 'Relatório do dia' }))
+
+    await waitFor(() => expect(cartao('valor-pago')).toHaveTextContent(/R\$\s*52,50/), ESPERA)
+    expect(cartao('valor-a-pagar')).toHaveTextContent(/R\$\s*0,00/)
+  })
+
   it('a data escolhida sobrevive a uma ida ao Caixa', async () => {
     const datas = responderCom(relatorioDoDiaMock())
     renderizarApp('/relatorio')
