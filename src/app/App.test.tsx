@@ -5,7 +5,7 @@ import type { PerfilUsuario } from '@/shared/dominio'
 import { entrarComo, redefinirSessao, renderizarApp } from '@/test/sessao'
 
 const INICIO = 'Início'
-const OPERACAO = ['Despacho', 'Monitoramento', 'Acerto', 'Caixa']
+const OPERACAO = ['Despacho', 'Monitoramento', 'Acerto', 'Caixa', 'Relatório do dia']
 const LOJA = ['Entregadores', 'Faixas de preço', 'Parâmetros da loja', 'Integração']
 
 function itensDoMenu(): string[] {
@@ -71,7 +71,7 @@ describe('casca do app - guardas e menu por perfil', () => {
     await esperarTitulo('Acesso negado')
   })
 
-  it.each(['/despacho', '/monitoramento', '/acerto', '/caixa', '/loja/entregadores'])(
+  it.each(['/despacho', '/monitoramento', '/acerto', '/caixa', '/relatorio', '/loja/entregadores'])(
     'ADMIN_GERAL e barrado em %s e so tem Restaurantes no menu',
     async (rota) => {
       entrarComo('ADMIN_GERAL')
