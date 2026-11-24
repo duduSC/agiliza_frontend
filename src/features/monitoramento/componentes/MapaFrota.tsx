@@ -8,12 +8,13 @@
  * - Somente consulta: nenhuma acao altera estado.
  */
 import { useMemo } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, Tooltip } from 'react-leaflet'
+import { MapContainer, Marker, Popup, Tooltip } from 'react-leaflet'
 import type L from 'leaflet'
 import type { MotoboyResponse } from '@/shared/api/schemas'
 import type { StatusDisponibilidadeMotoboy } from '@/shared/dominio/enums'
 import { LABEL_STATUS_DISPONIBILIDADE_MOTOBOY } from '@/shared/dominio/enums'
 import { formatarHora } from '@/shared/formatacao'
+import { CamadaMapaClaro } from '@/shared/ui/mapa/CamadaMapaClaro'
 import { EnquadrarMapa } from '@/shared/ui/mapa/EnquadrarMapa'
 import type { PontoDoMapa } from '@/shared/ui/mapa/enquadramento'
 import { PINO_AMBAR, PINO_AZUL, PINO_VERDE, PINO_VERMELHO } from '@/shared/ui/mapa/icones'
@@ -70,10 +71,7 @@ export function MapaFrota({ entregadores, coordenadaLoja, agora }: Props) {
         className="h-full w-full rounded-lg"
         scrollWheelZoom
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <CamadaMapaClaro />
 
         <EnquadrarMapa pontos={pontos} />
 

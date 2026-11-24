@@ -8,6 +8,7 @@
  * - Tempo real via STOMP com polling 15 s de fallback.
  */
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/shared/ui/estados'
 import { useEstabelecimentoAtual } from '@/features/loja'
 import { ehErroApi } from '@/shared/api/erros'
@@ -48,7 +49,10 @@ export function MonitoramentoPagina() {
             Monitoramento
           </h1>
           <p className="text-sm text-muted-foreground">
-            Posição da frota em tempo real.
+            Posição da frota em tempo real.{' '}
+            <Link to="/despacho" className="font-medium text-emerald-700 underline underline-offset-2">
+              Ver pedidos e entregadores juntos na operação (Despacho)
+            </Link>
           </p>
         </div>
         <IndicadorTempoReal />

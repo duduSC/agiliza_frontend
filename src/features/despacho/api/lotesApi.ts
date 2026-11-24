@@ -22,6 +22,16 @@ export async function listarLotesDespachados(signal?: AbortSignal): Promise<Lote
   })
 }
 
+/** Lotes EM_ROTA (T010): dão o entregador de cada entrega que saiu. */
+export async function listarLotesEmRota(signal?: AbortSignal): Promise<LoteEntregaResponse[]> {
+  return requisitar({
+    caminho: ENDPOINTS.lotes.listar,
+    query: { status: 'EM_ROTA' },
+    schema: listaLotesSchema,
+    signal,
+  })
+}
+
 export function despacharLote(corpo: DespacharLoteRequest): Promise<LoteEntregaResponse> {
   return requisitar({
     metodo: 'POST',

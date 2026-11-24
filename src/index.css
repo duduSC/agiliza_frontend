@@ -88,3 +88,28 @@
     outline-offset: 2px;
   }
 }
+
+/*
+ * Mapas (T010). Fora de `@layer` de propósito: o `leaflet.css` não está em camada, e uma regra em
+ * camada perde para ele, qualquer que seja a especificidade.
+ */
+
+/* Fundo claro e discreto: o OSM padrão quase sem cor, com os nomes de bairros e avenidas legíveis.
+   Só a camada de tiles; pinos, rótulos e atribuição mantêm a cor. */
+.camada-mapa-clara {
+  filter: saturate(0.25) brightness(1.06) contrast(0.92);
+}
+
+/* Ícones da operação (divIcon): sem o quadrado branco padrão do Leaflet. */
+.leaflet-marker-icon.icone-operacao {
+  background: transparent;
+  border: 0;
+}
+
+/* Nome do entregador sob o ícone (HU08): compacto, para não cobrir o mapa. */
+.leaflet-tooltip.rotulo-entregador {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}

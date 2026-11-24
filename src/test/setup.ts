@@ -4,6 +4,7 @@ import { cleanup, configure } from '@testing-library/react'
 import { toast } from 'sonner'
 import { vi } from 'vitest'
 import { useFiltroAcertoStore } from '@/features/acerto/filtroStore'
+import { useFiltroOperacaoStore } from '@/features/despacho/filtroOperacaoStore'
 import { useSelecaoStore } from '@/features/despacho/selecaoStore'
 import { useFiltroRelatorioStore } from '@/features/relatorio/filtroStore'
 import { mapaFalso } from './mapaFalso'
@@ -18,8 +19,16 @@ import { server } from './msw/server'
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'mapa-leaflet' }, children),
-  TileLayer: () => null,
+  // A camada expõe o que importa conferir: de onde vêm os tiles e a atribuição (T010).
+  TileLayer: (props: { url: string; attribution?: string; className?: string }) =>
+    React.createElement('div', {
+      'data-testid': 'camada-mapa',
+      'data-url': props.url,
+      'data-atribuicao': props.attribution,
+      'data-classe': props.className,
+    }),
   useMap: () => mapaFalso,
+  Pane: () => null,
   Marker: (props: {
     children: React.ReactNode
     position: [number, number]
@@ -40,6 +49,8 @@ vi.mock('react-leaflet', () => ({
       {
         'data-testid': 'pino-mapa',
         title: props.title,
+        // A posição atual, para provar que o entregador anda no mapa (T010).
+        'data-posicao': props.position.join(','),
         onClick: props.eventHandlers?.click,
         // Arrastar: o teste dispara `dragEnd` e o pino "cai" 0,001 grau ao norte e a leste.
         onDragEnd: props.eventHandlers?.dragend
@@ -64,10 +75,13 @@ vi.mock('leaflet', () => {
       static mergeOptions() {}
     }
   }
+  // divIcon (T010): devolve as opções, o bastante para o `<Marker>` falso não lançar.
+  const divIcon = (opcoes: object) => ({ ...opcoes })
   return {
-    default: { Icon, icon: () => ({}) },
+    default: { Icon, icon: () => ({}), divIcon },
     Icon,
     icon: () => ({}),
+    divIcon,
   }
 })
 
@@ -123,5 +137,6 @@ afterEach(() => {
   useFiltroAcertoStore.getState().limpar()
   useSelecaoStore.getState().limparSelecao()
   useFiltroRelatorioStore.getState().limpar()
+  useFiltroOperacaoStore.getState().limpar()
 })
 afterAll(() => server.close())

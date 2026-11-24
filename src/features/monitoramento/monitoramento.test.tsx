@@ -12,6 +12,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { useSessaoStore } from '@/features/auth'
 import { sementeMotoboys, IDS_MOTOBOYS } from '@/test/msw/dadosMotoboys'
 import type { MotoboyResponse } from '@/shared/api/schemas'
@@ -86,9 +87,12 @@ function limparSessao() {
 
 function renderizarMonitoramento(queryClient?: QueryClient) {
   const qc = queryClient ?? criarQueryClientComDados()
+  // Roteador: a página aponta para a operação unificada no Despacho (T010).
   const resultado = render(
     <QueryClientProvider client={qc}>
-      <MonitoramentoPagina />
+      <MemoryRouter>
+        <MonitoramentoPagina />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
   return { ...resultado, queryClient: qc }
@@ -268,5 +272,10 @@ describe('pagina de monitoramento (composicao)', () => {
     renderizarMonitoramento()
     expect(screen.getByRole('heading', { level: 1, name: /monitoramento/i })).toBeInTheDocument()
     expect(screen.getByText(/posição da frota em tempo real/i)).toBeInTheDocument()
+  })
+
+  it('continua existindo e aponta para a operação unificada no Despacho (T010)', () => {
+    renderizarMonitoramento()
+    expect(screen.getByRole('link', { name: /pedidos e entregadores juntos/i })).toHaveAttribute('href', '/despacho')
   })
 })

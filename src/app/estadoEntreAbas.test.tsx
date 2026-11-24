@@ -97,4 +97,36 @@ describe('Despacho', () => {
     renderizarApp('/despacho')
     expect(await screen.findByRole('checkbox', { name: 'Selecionar entrega de Ana Souza' }, ESPERA)).not.toBeChecked()
   })
+
+  it('o filtro da operação ("Saiu para entrega") sobrevive a uma ida ao Caixa', async () => {
+    renderizarApp('/despacho')
+    fireEvent.click(await screen.findByRole('button', { name: 'Saiu para entrega' }, ESPERA))
+
+    irPeloMenu('Caixa')
+    await screen.findByRole('heading', { name: 'Caixa', level: 1 }, ESPERA)
+    irPeloMenu('Despacho')
+
+    expect(await screen.findByRole('button', { name: 'Saiu para entrega' }, ESPERA)).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(await screen.findByRole('group', { name: /^Pedido 1: Gabi Torres/ }, ESPERA)).toBeInTheDocument()
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('a troca de sessão volta o filtro da operação para "Aguardando despacho"', async () => {
+    const primeira = renderizarApp('/despacho')
+    fireEvent.click(await screen.findByRole('button', { name: 'Todos' }, ESPERA))
+    primeira.unmount()
+
+    act(() => {
+      useSessaoStore.getState().encerrarSessao()
+      entrarComo('OPERADOR')
+    })
+    renderizarApp('/despacho')
+    expect(await screen.findByRole('button', { name: 'Aguardando despacho' }, ESPERA)).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
 })
