@@ -1,6 +1,6 @@
 # T010 — Revisão no painel, estado entre abas, relatório do dia e tela de operação unificada
 
-**Status:** EM_ANDAMENTO
+**Status:** CONCLUIDA
 **Fase:** pós-apresentação (ajustes do teste de 23/11)
 **Depende de:** T009 (CONCLUIDA). Do backend: `../../ADS_EduardoCamargo_AgilizaDelivery/agente_backend/tarefas/T015-recibos-do-entregador-relatorio-moto-e-enderecos.md`, só no item 3, e não bloqueia: use MSW no contrato da D013.
 **Referências no DVP:** UC01, UC04, UC08 A1, HU14, 1.5.5 passo 8, R04. Decisão D013 (`../../decisoes/D013-ajustes-pos-teste-23-11.md`)
