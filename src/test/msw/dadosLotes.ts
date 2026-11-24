@@ -2,6 +2,7 @@
  * "Banco" em memoria dos lotes para os handlers MSW (T004).
  */
 import type { LoteEntregaResponse } from '@/shared/api/schemas'
+import { criarLoteResponse } from '@/test/fabricas'
 
 export const IDS_LOTES = {
   despachado: '88888888-8888-4888-8888-888888888888',
@@ -9,15 +10,11 @@ export const IDS_LOTES = {
 } as const
 
 function criarLote(sobrescrever: Partial<LoteEntregaResponse> & { id: string }): LoteEntregaResponse {
-  return {
-    estabelecimentoId: '6f1c2a3b-4d5e-4f60-8a71-0b2c3d4e5f60',
-    motoboyId: 'aa111111-1111-4111-8111-aaa111111111',
-    usuarioDespachanteId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-    status: 'DESPACHADO',
-    qtdEntregas: 2,
-    criadoEm: '2026-11-11T10:00:00',
+  return criarLoteResponse({
+    // Quem tem lote fica EM_ROTA no backend (LoteEntregaServiceImpl.despachar).
+    motoboyId: 'ee555555-5555-4555-8555-eee555555555',
     ...sobrescrever,
-  }
+  })
 }
 
 export function sementeLotes(): LoteEntregaResponse[] {

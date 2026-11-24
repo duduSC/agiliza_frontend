@@ -1,4 +1,5 @@
 import {
+  destinoDepoisDoLogin,
   perfilAcessaBackoffice,
   podeAcessarTela,
   podeReabrirCaixa,
@@ -10,7 +11,7 @@ import {
 const caminhos = (perfil: Parameters<typeof telasDoPerfil>[0]) =>
   telasDoPerfil(perfil).map((t) => t.caminho)
 
-const OPERACAO = ['/despacho', '/monitoramento', '/acerto', '/caixa']
+const OPERACAO = ['/despacho', '/monitoramento', '/acerto', '/caixa', '/relatorio']
 const LOJA = ['/loja/entregadores', '/loja/faixas-preco', '/loja/parametros', '/loja/integracao']
 
 describe('permissões por perfil (AGENT.md, seção 7)', () => {
@@ -41,6 +42,19 @@ describe('permissões por perfil (AGENT.md, seção 7)', () => {
     expect(primeiraTelaDoPerfil('ADMIN_GERAL')).toBe('/restaurantes')
     expect(primeiraTelaDoPerfil('OPERADOR')).toBe('/despacho')
     expect(primeiraTelaDoPerfil('ADMIN_RESTAURANTE')).toBe('/loja/entregadores')
+  })
+
+  it('destino depois do login (T008): /inicio, ou a rota guardada se o perfil a acessa', () => {
+    expect(destinoDepoisDoLogin('OPERADOR', undefined)).toBe('/inicio')
+    expect(destinoDepoisDoLogin('OPERADOR', '/despacho')).toBe('/despacho')
+    expect(destinoDepoisDoLogin('OPERADOR', '/acerto?motoboyId=x')).toBe('/acerto?motoboyId=x')
+    expect(destinoDepoisDoLogin('OPERADOR', '/loja/parametros')).toBe('/inicio')
+    expect(destinoDepoisDoLogin('ADMIN_GERAL', '/despacho')).toBe('/inicio')
+    expect(destinoDepoisDoLogin('ADMIN_GERAL', '/restaurantes')).toBe('/restaurantes')
+    expect(destinoDepoisDoLogin('OPERADOR', '//exemplo.com/despacho')).toBe('/inicio')
+    expect(destinoDepoisDoLogin('OPERADOR', 'https://exemplo.com')).toBe('/inicio')
+    expect(destinoDepoisDoLogin('OPERADOR', '/login')).toBe('/inicio')
+    expect(destinoDepoisDoLogin('OPERADOR', 42)).toBe('/inicio')
   })
 
   it('"Reabrir caixa" é exclusivo do ADMIN_RESTAURANTE', () => {

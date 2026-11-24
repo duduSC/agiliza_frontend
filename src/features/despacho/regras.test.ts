@@ -10,6 +10,7 @@ import {
   descreverFormaPagamento,
   minutosDeEspera,
   podeAjustarCoordenada,
+  podeAnalisarContestacao,
   podeCancelar,
   podeMarcarPronto,
 } from './regras'
@@ -92,10 +93,18 @@ describe('podeAjustarCoordenada', () => {
     ).toBe(true)
   })
 
-  it('nao permite para SEM_DISTANCIA', () => {
+  it('permite para SEM_DISTANCIA (T010: reposicionar pino)', () => {
     expect(
       podeAjustarCoordenada(
         entregaBase({ pendenteRevisao: true, motivoRevisao: 'SEM_DISTANCIA' }),
+      ),
+    ).toBe(true)
+  })
+
+  it('nao permite reposicionar entrega ja finalizada', () => {
+    expect(
+      podeAjustarCoordenada(
+        entregaBase({ status: 'ENTREGUE', pendenteRevisao: true, motivoRevisao: 'SEM_DISTANCIA' }),
       ),
     ).toBe(false)
   })
@@ -182,5 +191,27 @@ describe('descreverCobranca', () => {
     const resultado = descreverCobranca({ pagoOnline: false, trocoPara: 100 })
     expect(resultado).toContain('troco para')
     expect(resultado).toContain('R$')
+  })
+})
+
+describe('podeAnalisarContestacao (T010)', () => {
+  it('permite para CONTESTACAO_ENTREGADOR pendente, mesmo em estado final', () => {
+    expect(
+      podeAnalisarContestacao(
+        entregaBase({ status: 'ENTREGUE', pendenteRevisao: true, motivoRevisao: 'CONTESTACAO_ENTREGADOR' }),
+      ),
+    ).toBe(true)
+  })
+
+  it('nao permite para revisao de localizacao', () => {
+    expect(
+      podeAnalisarContestacao(entregaBase({ pendenteRevisao: true, motivoRevisao: 'SEM_DISTANCIA' })),
+    ).toBe(false)
+  })
+
+  it('nao permite sem revisao pendente', () => {
+    expect(
+      podeAnalisarContestacao(entregaBase({ pendenteRevisao: false, motivoRevisao: 'CONTESTACAO_ENTREGADOR' })),
+    ).toBe(false)
   })
 })

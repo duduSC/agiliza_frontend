@@ -2,15 +2,18 @@
  * Estado de selecao de entregas para despacho (T004). Store Zustand local da feature,
  * nao global (Constituicao 5.6: limite maxPedidosPorLote).
  *
- * A selecao fica em memoria e e limpa ao despachar, ao navegar, ou ao trocar de sessao.
+ * A selecao fica em memoria e e limpa ao despachar ou ao trocar de sessao. Desde a T010 ela
+ * sobrevive a troca de aba; quem saiu da lista sai da selecao (`manterApenas`).
  */
 import { create } from 'zustand'
+import { aoTrocarDeSessao } from '@/features/auth'
 
 type EstadoSelecao = {
   selecionadas: ReadonlySet<string>
   maxPedidosPorLote: number
   alternarSelecao: (id: string) => boolean
   limparSelecao: () => void
+  manterApenas: (ids: readonly string[]) => void
   definirLimite: (max: number) => void
   estaSelecionada: (id: string) => boolean
   limiteAtingido: () => boolean
@@ -39,6 +42,14 @@ export const useSelecaoStore = create<EstadoSelecao>()((set, get) => ({
 
   limparSelecao: () => set({ selecionadas: new Set<string>() }),
 
+  // Preserva a ordem de selecao, que vira a ordem das paradas no lote.
+  manterApenas: (ids: readonly string[]) => {
+    const { selecionadas } = get()
+    const visiveis = new Set(ids)
+    const nova = [...selecionadas].filter((id) => visiveis.has(id))
+    if (nova.length !== selecionadas.size) set({ selecionadas: new Set(nova) })
+  },
+
   definirLimite: (max: number) => set({ maxPedidosPorLote: max }),
 
   estaSelecionada: (id: string) => get().selecionadas.has(id),
@@ -48,3 +59,6 @@ export const useSelecaoStore = create<EstadoSelecao>()((set, get) => ({
     return selecionadas.size >= maxPedidosPorLote
   },
 }))
+
+// A seleção sobrevive à troca de aba (T010), mas nunca à troca de sessão.
+aoTrocarDeSessao(() => useSelecaoStore.getState().limparSelecao())

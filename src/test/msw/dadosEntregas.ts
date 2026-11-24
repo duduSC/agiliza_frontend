@@ -15,6 +15,7 @@ export const IDS_ENTREGAS = {
   revisaoSemDistancia: '55555555-5555-4555-8555-555555555555',
   revisaoContestacao: '66666666-6666-4666-8666-666666666666',
   despachada: '77777777-7777-4777-8777-777777777777',
+  despachada2: '7a777777-7777-4777-8777-777777777777',
 } as const
 
 export function sementeEntregas(): EntregaResponse[] {
@@ -90,6 +91,15 @@ export function sementeEntregas(): EntregaResponse[] {
       coordenada: { latitude: -23.6, longitude: -46.68 },
       distanciaKm: 2,
       valorRepasse: 8,
+    }),
+    criarEntregaResponse({
+      id: IDS_ENTREGAS.despachada2,
+      nomeCliente: 'Hugo Prado',
+      status: 'DESPACHADA',
+      loteId: '88888888-8888-4888-8888-888888888888',
+      coordenada: { latitude: -23.61, longitude: -46.69 },
+      distanciaKm: 3,
+      valorRepasse: 10,
     }),
   ]
 }

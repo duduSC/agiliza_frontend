@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useDespacharLote, useEntregadoresDisponiveis } from '../api/hooks'
 import { useSelecaoStore } from '../selecaoStore'
 import { mensagemDoErro } from '../util'
@@ -34,23 +35,25 @@ export function DialogoDespacho({ aoFechar }: Props) {
 
   const entregaIds = Array.from(selecionadas)
 
-  const aoConfirmar = async () => {
-    if (!motoboyId || despachar.isPending) return
-    setErroServidor(null)
-    try {
-      await despachar.mutateAsync({ motoboyId, entregaIds })
-      toast.success(`Lote com ${entregaIds.length} entrega(s) despachado.`)
-      limparSelecao()
-      aoFechar()
-    } catch (erro) {
-      setErroServidor(mensagemDoErro(erro))
-    }
-  }
+  const envioUnico = useEnvioUnico()
+  const aoConfirmar = () =>
+    void envioUnico(async () => {
+      if (!motoboyId) return
+      setErroServidor(null)
+      try {
+        await despachar.mutateAsync({ motoboyId, entregaIds })
+        toast.success(`Lote com ${entregaIds.length} entrega(s) despachado.`)
+        limparSelecao()
+        aoFechar()
+      } catch (erro) {
+        setErroServidor(mensagemDoErro(erro))
+      }
+    })
 
   let estadoLista: EstadoTela
   if (consulta.isPending) {
     estadoLista = { tipo: 'carregando' }
-  } else if (consulta.isError) {
+  } else if (consulta.data === undefined) {
     estadoLista = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -60,7 +63,7 @@ export function DialogoDespacho({ aoFechar }: Props) {
     estadoLista = {
       tipo: 'vazio',
       titulo: 'Nenhum entregador online',
-      descricao: 'Nao ha entregadores disponiveis para despacho no momento.',
+      descricao: 'Não há entregadores disponíveis para despacho no momento.',
     }
   } else {
     estadoLista = {
@@ -75,7 +78,10 @@ export function DialogoDespacho({ aoFechar }: Props) {
     }
   }
 
-  const podeFinalizar = motoboyId !== null && !despachar.isPending
+  const podeFinalizar =
+    entregaIds.length > 0 &&
+    !despachar.isPending &&
+    consulta.data?.some((m) => m.id === motoboyId) === true
 
   return (
     <Dialog
@@ -114,7 +120,7 @@ export function DialogoDespacho({ aoFechar }: Props) {
             onClick={aoConfirmar}
             disabled={!podeFinalizar}
           >
-            {despachar.isPending ? 'Despachando...' : 'Confirmar despacho'}
+            {despachar.isPending ? 'Despachando…' : 'Confirmar despacho'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -133,12 +139,12 @@ function ListaEntregadores({
 }) {
   return (
     <fieldset>
-      <legend className="sr-only">Entregadores disponiveis</legend>
-      <ul className="flex flex-col gap-2" role="radiogroup" aria-label="Entregadores disponiveis">
+      <legend className="sr-only">Entregadores disponíveis</legend>
+      <ul className="flex flex-col gap-2" role="radiogroup" aria-label="Entregadores disponíveis">
         {motoboys.map((m) => (
           <li key={m.id}>
             <label
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
                 selecionado === m.id
                   ? 'border-primary bg-primary/5'
                   : 'border-border hover:bg-accent/50'

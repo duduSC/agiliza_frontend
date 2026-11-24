@@ -7,15 +7,8 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { useSessaoStore } from '@/features/auth'
-import { obterEstadoConexao } from '@/shared/realtime'
+import { usePollingDeReserva } from '@/shared/realtime'
 import { listarEntregadoresNoMapa } from './motoboysMonitoramentoApi'
-
-export const INTERVALO_POLLING_FROTA_MS = 15_000
-
-/** Polling ativo apenas quando STOMP desconectado. */
-function intervaloPolling(): number | false {
-  return obterEstadoConexao() === 'conectado' ? false : INTERVALO_POLLING_FROTA_MS
-}
 
 export const chavesMotoboysMonitoramento = {
   todas: (estabelecimentoId: string | null) => ['motoboys', estabelecimentoId] as const,
@@ -32,10 +25,11 @@ function useEstabelecimentoDaSessao(): string | null {
  */
 export function useEntregadoresNoMapa() {
   const estabelecimentoId = useEstabelecimentoDaSessao()
+  const refetchInterval = usePollingDeReserva()
   return useQuery({
     queryKey: chavesMotoboysMonitoramento.noMapa(estabelecimentoId),
     queryFn: ({ signal }) => listarEntregadoresNoMapa(signal),
     enabled: estabelecimentoId !== null,
-    refetchInterval: intervaloPolling,
+    refetchInterval,
   })
 }

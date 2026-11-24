@@ -4,6 +4,7 @@
  */
 import { http, HttpResponse } from 'msw'
 import { ENDPOINTS } from '@/shared/api'
+import { erroApi } from './respostas'
 
 /** Credenciais validas aceitas pelo mock. */
 export const CREDENCIAIS_VALIDAS = {
@@ -44,20 +45,6 @@ const USUARIOS_MOCK = {
   },
 } as const
 
-function erroApi(status: number, codigo: string, message: string) {
-  return HttpResponse.json(
-    {
-      timestamp: new Date().toISOString(),
-      status,
-      error: status === 401 ? 'Unauthorized' : 'Forbidden',
-      codigo,
-      message,
-      path: '/api/auth/login',
-    },
-    { status },
-  )
-}
-
 /** Token de refresh valido aceito pelo mock. */
 export const REFRESH_TOKEN_VALIDO = 'refresh-token-valido'
 
@@ -69,12 +56,16 @@ export const handlersAuth = [
 
     const usuario = USUARIOS_MOCK[email as keyof typeof USUARIOS_MOCK]
     if (!usuario) {
-      return erroApi(401, 'CREDENCIAIS_INVALIDAS', 'E-mail ou senha invalidos.')
+      return erroApi(request, 401, 'CREDENCIAIS_INVALIDAS', 'E-mail ou senha inválidos.')
     }
 
     // Verifica senha (todas as contas de teste usam 'senha123')
     if (senha !== 'senha123') {
-      return erroApi(401, 'CREDENCIAIS_INVALIDAS', 'E-mail ou senha invalidos.')
+      return erroApi(request, 401, 'CREDENCIAIS_INVALIDAS', 'E-mail ou senha inválidos.')
+    }
+    // Sem `canal`, o backend assume BACKOFFICE e recusa o entregador (UC07 E4).
+    if (usuario.perfil === 'ENTREGADOR') {
+      return erroApi(request, 403, 'ACESSO_NEGADO', 'Entregadores acessam o sistema apenas pelo aplicativo.')
     }
 
     return HttpResponse.json({
@@ -87,7 +78,7 @@ export const handlersAuth = [
   http.post(`*${ENDPOINTS.auth.refresh}`, async ({ request }) => {
     const corpo = (await request.json()) as { refreshToken?: string }
     if (corpo.refreshToken !== REFRESH_TOKEN_VALIDO) {
-      return erroApi(401, 'CREDENCIAIS_INVALIDAS', 'Refresh token invalido.')
+      return erroApi(request, 401, 'NAO_AUTENTICADO', 'Sessão inválida ou expirada.')
     }
 
     return HttpResponse.json({

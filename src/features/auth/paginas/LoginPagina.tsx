@@ -7,31 +7,36 @@
  * - Loading no botao, bloqueio de duplo clique.
  */
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { ehErroApi } from '@/shared/api/erros'
 import { MENSAGENS_ERRO } from '@/shared/api/erros'
-import { primeiraTelaDoPerfil } from '@/shared/dominio'
+import { destinoDepoisDoLogin } from '@/shared/dominio'
+import type { EstadoIdaAoLogin } from '../componentes/guardas'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { fazerLogin } from '../api/authApi'
 import { useSessaoStore, MENSAGEM_PERFIL_SEM_ACESSO } from '../sessaoStore'
 
 const loginSchema = z.object({
-  loginEmail: z.string().email('Informe um e-mail valido.'),
+  loginEmail: z.string().email('Informe um e-mail válido.'),
   senha: z.string().min(1, 'Informe a senha.'),
 })
 
 export function LoginPagina() {
   const iniciarSessao = useSessaoStore((s) => s.iniciarSessao)
   const navigate = useNavigate()
+  const local = useLocation()
+  const destinoGuardado = (local.state as EstadoIdaAoLogin | null)?.de
 
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [errosCampo, setErrosCampo] = useState<{ email?: string; senha?: string }>({})
   const [enviando, setEnviando] = useState(false)
+  const envioUnico = useEnvioUnico()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -50,6 +55,10 @@ export function LoginPagina() {
       return
     }
 
+    await envioUnico(entrar)
+  }
+
+  async function entrar() {
     setEnviando(true)
     try {
       const resposta = await fazerLogin({ loginEmail: email, senha })
@@ -66,9 +75,8 @@ export function LoginPagina() {
         return
       }
 
-      // Redirecionar para a primeira tela do perfil
-      const destino = primeiraTelaDoPerfil(resposta.usuario.perfil)
-      navigate(destino ?? '/', { replace: true })
+      // T008: volta ao destino guardado (se o perfil puder abri-lo); senao, /inicio.
+      navigate(destinoDepoisDoLogin(resposta.usuario.perfil, destinoGuardado), { replace: true })
     } catch (err) {
       if (ehErroApi(err)) {
         switch (err.codigo) {
@@ -83,14 +91,18 @@ export function LoginPagina() {
             setErro(MENSAGENS_ERRO.USUARIO_BLOQUEADO)
             break
           case 'ACESSO_NEGADO':
-            // Canal errado (improvavel no backoffice, mas tratar)
+            // Caminho real do entregador: o backend recusa o canal com 403 (UC07 E4)
             setErro(MENSAGEM_PERFIL_SEM_ACESSO)
             break
-          default:
-            setErro(err.mensagem)
+          default: {
+            const doEmail = err.campos.find((c) => c.campo === 'loginEmail')?.mensagem
+            const daSenha = err.campos.find((c) => c.campo === 'senha')?.mensagem
+            if (doEmail || daSenha) setErrosCampo({ email: doEmail, senha: daSenha })
+            else setErro(err.mensagem)
+          }
         }
       } else {
-        setErro('Erro de conexao. Verifique sua internet e tente novamente.')
+        setErro('Não foi possível entrar. Tente novamente.')
       }
     } finally {
       setEnviando(false)

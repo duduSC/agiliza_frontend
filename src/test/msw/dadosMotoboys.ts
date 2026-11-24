@@ -2,6 +2,7 @@
  * "Banco" em memoria dos entregadores para os handlers MSW (T004 + T005).
  */
 import type { MotoboyResponse } from '@/shared/api/schemas'
+import { IDS, criarMotoboyResponse } from '@/test/fabricas'
 
 export const IDS_MOTOBOYS = {
   online1: 'aa111111-1111-4111-8111-aaa111111111',
@@ -13,14 +14,10 @@ export const IDS_MOTOBOYS = {
 } as const
 
 function criarMotoboy(sobrescrever: Partial<MotoboyResponse> & { id: string; nome: string }): MotoboyResponse {
-  return {
-    usuarioId: `usr-${sobrescrever.id}`,
-    telefone: '(11) 99999-0001',
-    statusCadastro: 'ATIVO',
-    statusDisponibilidade: 'ONLINE',
-    criadoEm: '2026-11-09T08:00:00',
+  return criarMotoboyResponse({
+    usuarioId: `d0000000-0000-4000-8000-${sobrescrever.id.slice(-12)}`,
     ...sobrescrever,
-  }
+  })
 }
 
 export function sementeMotoboys(): MotoboyResponse[] {
@@ -76,6 +73,8 @@ export function sementeMotoboys(): MotoboyResponse[] {
       statusCadastro: 'BLOQUEADO',
       statusDisponibilidade: 'ONLINE',
     }),
+    // O entregador do extrato de exemplo do acerto.
+    criarMotoboy({ id: IDS.motoboy, nome: 'Entregador Exemplo', statusDisponibilidade: 'OFFLINE' }),
   ]
 }
 
@@ -83,6 +82,10 @@ let motoboys: MotoboyResponse[] = sementeMotoboys()
 
 export const dbMotoboys = {
   todos: (): MotoboyResponse[] => motoboys,
+  buscar: (id: string) => motoboys.find((m) => m.id === id),
+  atualizar: (id: string, mudancas: Partial<MotoboyResponse>) => {
+    motoboys = motoboys.map((m) => (m.id === id ? { ...m, ...mudancas } : m))
+  },
 }
 
 export function redefinirMotoboys(): void {

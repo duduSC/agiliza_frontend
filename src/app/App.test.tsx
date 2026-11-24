@@ -4,7 +4,8 @@ import { MENSAGEM_PERFIL_SEM_ACESSO, useSessaoStore } from '@/features/auth'
 import type { PerfilUsuario } from '@/shared/dominio'
 import { entrarComo, redefinirSessao, renderizarApp } from '@/test/sessao'
 
-const OPERACAO = ['Despacho', 'Monitoramento', 'Acerto', 'Caixa']
+const INICIO = 'Início'
+const OPERACAO = ['Despacho', 'Monitoramento', 'Acerto', 'Caixa', 'Relatório do dia']
 const LOJA = ['Entregadores', 'Faixas de preço', 'Parâmetros da loja', 'Integração']
 
 function itensDoMenu(): string[] {
@@ -40,7 +41,7 @@ describe('casca do app - guardas e menu por perfil', () => {
     entrarComo('OPERADOR')
     renderizarApp('/despacho')
     await esperarTitulo('Despacho')
-    expect(itensDoMenu()).toEqual(OPERACAO)
+    expect(itensDoMenu()).toEqual([INICIO, ...OPERACAO])
     expect(screen.getByTestId('nome-usuario')).toHaveTextContent('Operador (teste)')
   })
 
@@ -60,7 +61,7 @@ describe('casca do app - guardas e menu por perfil', () => {
       entrarComo('ADMIN_RESTAURANTE')
       renderizarApp(rota)
       await esperarTitulo(rota === '/despacho' ? 'Despacho' : 'Parâmetros da loja')
-      expect(itensDoMenu()).toEqual([...LOJA, ...OPERACAO])
+      expect(itensDoMenu()).toEqual([INICIO, ...LOJA, ...OPERACAO])
     },
   )
 
@@ -70,30 +71,30 @@ describe('casca do app - guardas e menu por perfil', () => {
     await esperarTitulo('Acesso negado')
   })
 
-  it.each(['/despacho', '/monitoramento', '/acerto', '/caixa', '/loja/entregadores'])(
+  it.each(['/despacho', '/monitoramento', '/acerto', '/caixa', '/relatorio', '/loja/entregadores'])(
     'ADMIN_GERAL e barrado em %s e so tem Restaurantes no menu',
     async (rota) => {
       entrarComo('ADMIN_GERAL')
       renderizarApp(rota)
       await esperarTitulo('Acesso negado')
-      expect(itensDoMenu()).toEqual(['Restaurantes'])
+      expect(itensDoMenu()).toEqual([INICIO, 'Restaurantes'])
     },
   )
 
-  it.each<[PerfilUsuario, string]>([
-    ['ADMIN_GERAL', '/restaurantes'],
-    ['ADMIN_RESTAURANTE', '/loja/entregadores'],
-    ['OPERADOR', '/despacho'],
-  ])('%s em "/" vai para a primeira tela do perfil (%s)', async (perfil, destino) => {
-    entrarComo(perfil)
-    const { local } = renderizarApp('/')
-    await waitFor(() => expect(local.pathname).toBe(destino))
-  })
+  it.each<PerfilUsuario>(['ADMIN_GERAL', 'ADMIN_RESTAURANTE', 'OPERADOR'])(
+    '%s em "/" vai para a pagina inicial (T008)',
+    async (perfil) => {
+      entrarComo(perfil)
+      const { local } = renderizarApp('/')
+      await waitFor(() => expect(local.pathname).toBe('/inicio'))
+      await esperarTitulo('Início')
+    },
+  )
 
-  it('rota desconhecida volta para a primeira tela do perfil', async () => {
+  it('rota desconhecida volta para a pagina inicial (T008)', async () => {
     entrarComo('OPERADOR')
     const { local } = renderizarApp('/nao-existe')
-    await waitFor(() => expect(local.pathname).toBe('/despacho'))
+    await waitFor(() => expect(local.pathname).toBe('/inicio'))
   })
 })
 

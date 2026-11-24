@@ -326,7 +326,7 @@ Mapeie cada código para uma mensagem pt-BR em `shared/api/erros.ts`. Código de
 
 O `ADMIN_RESTAURANTE` **acessa também as telas do operador**, por decisão do Eduardo em 10/11/2026 (D004; o DVP é silente neste ponto). "Reabrir caixa" continua exclusivo dele. O `OPERADOR` não acessa as telas `/loja/*`. Se um ponto de permissão novo surgir sem regra clara, o padrão continua sendo o mais restritivo (Constituição 1.3).
 
-Depois do login, redirecione para a primeira tela do perfil. A rota sem permissão vai para `/acesso-negado`.
+Depois do login, redirecione para `/inicio`, a página inicial com atalhos para as telas do perfil. A exceção é quando havia um destino guardado que o perfil pode abrir: aí o usuário volta para ele. Decisão do Eduardo em 17/11/2026, D011, aplicada na T008. A rota sem permissão vai para `/acesso-negado`.
 
 ---
 

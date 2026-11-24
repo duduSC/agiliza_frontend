@@ -2,31 +2,36 @@
  * Fila de revisão (`pendenteRevisao = true`; HU01, UC01 A1; Constituição, Artigo 5.4).
  * Só três motivos existem. Entrega aqui NÃO aparece entre as pendentes de despacho.
  *
- * - SEM_COORDENADA: o operador informa latitude/longitude (o arrastar do pino é da F3);
- *   a distância é recalculada pelo backend e a tela só muda após a resposta.
- * - SEM_DISTANCIA: nenhuma ação nesta tarefa (padrão restritivo).
- * - CONTESTACAO_ENTREGADOR: a análise é do acerto (F5); aqui só é sinalizada.
+ * - SEM_COORDENADA: o operador informa latitude/longitude (não há pino para arrastar);
+ * - SEM_DISTANCIA: "Reposicionar pino" abre o mesmo formulário já com a coordenada atual, e o
+ *   pino âmbar no mapa pode ser arrastado (T010). Nos dois, o backend recalcula a distância e
+ *   tira da revisão; se a rota falhar de novo, a entrega continua aqui e o operador é avisado.
+ * - CONTESTACAO_ENTREGADOR: "Analisar contestação" (T010; `DialogoAnalisarContestacao`).
+ * A tela só muda após a resposta do servidor.
  */
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
-import type { EntregaResponse } from '@/shared/api'
+import { ehErroApi, type EntregaResponse } from '@/shared/api'
 import { LABEL_MOTIVO_REVISAO, LABEL_STATUS_ENTREGA } from '@/shared/dominio'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
+import { avisarResultadoDoPino } from '../avisos'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useAjustarCoordenada, useEntregasEmRevisao } from '../api/hooks'
 import {
   coordenadaFormSchema,
   paraAjustarCoordenadaRequest,
   type CoordenadaForm,
 } from '../formularios'
-import { podeAjustarCoordenada, podeCancelar } from '../regras'
+import { podeAjustarCoordenada, podeAnalisarContestacao, podeCancelar } from '../regras'
 import { mensagemDoErro } from '../util'
 import { CampoTexto } from './campos'
+import { BotaoAnalisarContestacao } from './DialogoAnalisarContestacao'
 import { BotaoCancelarEntrega } from './DialogoCancelarEntrega'
 
 export function ListaRevisao() {
@@ -34,7 +39,7 @@ export function ListaRevisao() {
 
   let estado: EstadoTela
   if (consulta.isPending) estado = { tipo: 'carregando' }
-  else if (consulta.isError)
+  else if (consulta.data === undefined)
     estado = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -64,6 +69,7 @@ export function ListaRevisao() {
           </span>
         )}
       </h2>
+      <AvisoDesatualizado consulta={consulta} />
       <ConteudoPorEstado estado={estado} />
     </section>
   )
@@ -86,7 +92,7 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
           Revisão: {motivo}
         </Badge>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <div>
           <dt className="text-muted-foreground">Status</dt>
           <dd>{LABEL_STATUS_ENTREGA[entrega.status]}</dd>
@@ -106,40 +112,71 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
       </dl>
       {entrega.motivoRevisao === 'CONTESTACAO_ENTREGADOR' && (
         <p className="text-sm text-muted-foreground">
-          O entregador contestou o valor. A análise é feita na tela de acerto.
+          O entregador contestou o valor. A entrega fica fora do recibo até a revisão ser resolvida.
         </p>
       )}
-      {podeAjustarCoordenada(entrega) && <FormularioCoordenada entrega={entrega} />}
-      {podeCancelar(entrega) && (
-        <div className="flex justify-end">
-          <BotaoCancelarEntrega entrega={entrega} />
+      {podeAjustarCoordenada(entrega) && <ReposicionarPino entrega={entrega} />}
+      {(podeAnalisarContestacao(entrega) || podeCancelar(entrega)) && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {podeAnalisarContestacao(entrega) && <BotaoAnalisarContestacao entrega={entrega} />}
+          {podeCancelar(entrega) && <BotaoCancelarEntrega entrega={entrega} />}
         </div>
       )}
     </li>
   )
 }
 
+/** SEM_COORDENADA: formulário à mostra. SEM_DISTANCIA: atrás do botão, com a coordenada atual. */
+function ReposicionarPino({ entrega }: { entrega: EntregaResponse }) {
+  const [aberto, setAberto] = useState(entrega.coordenada == null)
+  if (!aberto) {
+    return (
+      <div className="flex flex-col gap-1">
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setAberto(true)}>
+          Reposicionar pino
+        </Button>
+        <p className="text-xs text-muted-foreground">Ou arraste o pino âmbar no mapa.</p>
+      </div>
+    )
+  }
+  return <FormularioCoordenada entrega={entrega} />
+}
+
 function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
   const ajustar = useAjustarCoordenada()
   const [erroServidor, setErroServidor] = useState<string | null>(null)
+  const envioUnico = useEnvioUnico()
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<CoordenadaForm>({
     resolver: zodResolver(coordenadaFormSchema),
-    defaultValues: { latitude: '', longitude: '' },
+    defaultValues: {
+      latitude: entrega.coordenada ? String(entrega.coordenada.latitude) : '',
+      longitude: entrega.coordenada ? String(entrega.coordenada.longitude) : '',
+    },
   })
 
   const enviar = handleSubmit(async (valores) => {
-    if (ajustar.isPending) return
-    setErroServidor(null)
-    try {
-      await ajustar.mutateAsync({ id: entrega.id, coordenada: paraAjustarCoordenadaRequest(valores) })
-      toast.success(`Coordenada de ${entrega.nomeCliente} enviada. A distância é recalculada pelo sistema.`)
-    } catch (erro) {
-      setErroServidor(mensagemDoErro(erro))
-    }
+    await envioUnico(async () => {
+      setErroServidor(null)
+      try {
+        const atualizada = await ajustar.mutateAsync({
+          id: entrega.id,
+          coordenada: paraAjustarCoordenadaRequest(valores),
+        })
+        avisarResultadoDoPino(atualizada)
+      } catch (erro) {
+        if (ehErroApi(erro)) {
+          for (const { campo, mensagem } of erro.campos) {
+            if (campo === 'latitude' || campo === 'longitude') setError(campo, { message: mensagem })
+          }
+        }
+        setErroServidor(mensagemDoErro(erro))
+      }
+    })
   })
 
   return (
@@ -147,7 +184,7 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
       onSubmit={enviar}
       noValidate
       aria-label={`Ajustar coordenada: entrega de ${entrega.nomeCliente}`}
-      className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start"
+      className="grid grid-cols-2 items-start gap-3"
     >
       <CampoTexto
         rotulo="Latitude"
@@ -163,11 +200,11 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
         erro={errors.longitude?.message}
         {...register('longitude')}
       />
-      <Button type="submit" className="sm:mt-6" disabled={ajustar.isPending}>
+      <Button type="submit" className="col-span-2" disabled={ajustar.isPending}>
         {ajustar.isPending ? 'Salvando…' : 'Salvar coordenada'}
       </Button>
       {erroServidor && (
-        <p role="alert" className="text-sm text-destructive sm:col-span-3">
+        <p role="alert" className="text-sm text-destructive col-span-2">
           {erroServidor}
         </p>
       )}

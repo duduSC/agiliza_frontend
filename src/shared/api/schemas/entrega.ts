@@ -66,13 +66,11 @@ export type CriarEntregaAvulsaRequest = {
 }
 
 /**
- * PROVISÓRIO: o backend não tem request DTO para o cancelamento — o serviço
- * `EntregaService.cancelar(..., motivo)` recebe só o motivo. Corpo proposto: `{ motivo }`.
+ * `dto/request/CancelarEntregaRequest.java`: motivo obrigatório, até 100 caracteres.
  */
 export type CancelarEntregaRequest = { motivo: string }
 
 /**
- * PROVISÓRIO: o backend não tem request DTO para o ajuste de pino — o serviço
- * `EntregaService.ajustarCoordenada(..., latitude, longitude, ...)`. Corpo proposto: `CoordenadaDto`.
+ * `dto/request/AjustarCoordenadaRequest.java`: latitude e longitude obrigatórias.
  */
 export type AjustarCoordenadaRequest = { latitude: number; longitude: number }

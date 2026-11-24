@@ -1,6 +1,6 @@
 /**
- * Chamadas de rede dos lotes (UC01 despacho e devolucao). PROVISORIOS
- * (`shared/api/endpoints.ts`) ate o backend publicar os controllers (T006).
+ * Chamadas de rede dos lotes (UC01 despacho e devolucao). Endpoints confirmados
+ * pelo backend (S008).
  */
 import { z } from 'zod'
 import { ENDPOINTS, requisitar } from '@/shared/api'
@@ -17,6 +17,16 @@ export async function listarLotesDespachados(signal?: AbortSignal): Promise<Lote
   return requisitar({
     caminho: ENDPOINTS.lotes.listar,
     query: { status: 'DESPACHADO' },
+    schema: listaLotesSchema,
+    signal,
+  })
+}
+
+/** Lotes EM_ROTA (T010): dão o entregador de cada entrega que saiu. */
+export async function listarLotesEmRota(signal?: AbortSignal): Promise<LoteEntregaResponse[]> {
+  return requisitar({
+    caminho: ENDPOINTS.lotes.listar,
+    query: { status: 'EM_ROTA' },
     schema: listaLotesSchema,
     signal,
   })

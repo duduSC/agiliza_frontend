@@ -95,21 +95,21 @@ describe('TotaisExtrato (Constituicao 5.1 — totais do backend)', () => {
 
     expect(screen.getByText('Total devido')).toBeInTheDocument()
     expect(screen.getByText('Total consolidado')).toBeInTheDocument()
-    expect(screen.getByText('Em revisao')).toBeInTheDocument()
+    expect(screen.getByText('Em revisão')).toBeInTheDocument()
   })
 
   it('mostra aviso quando possuiValorIndefinido', () => {
     const extrato = { ...sementeExtrato(), possuiValorIndefinido: true }
     render(<TotaisExtrato extrato={extrato} />)
 
-    expect(screen.getByText('Ha entregas sem valor calculado')).toBeInTheDocument()
+    expect(screen.getByText('Há entregas sem valor calculado')).toBeInTheDocument()
   })
 
   it('nao mostra aviso quando possuiValorIndefinido e false', () => {
     const extrato = { ...sementeExtrato(), possuiValorIndefinido: false }
     render(<TotaisExtrato extrato={extrato} />)
 
-    expect(screen.queryByText('Ha entregas sem valor calculado')).not.toBeInTheDocument()
+    expect(screen.queryByText('Há entregas sem valor calculado')).not.toBeInTheDocument()
   })
 })
 
@@ -182,7 +182,7 @@ describe('TabelaExtrato', () => {
     const linhaBruno = screen.getByText('Bruno Lima').closest('tr')
     expect(linhaBruno).toBeTruthy()
     if (linhaBruno) {
-      expect(within(linhaBruno).getByText('Recibo vinculado')).toBeInTheDocument()
+      expect(within(linhaBruno).getByText(/No recibo #dd444444/)).toBeInTheDocument()
       expect(within(linhaBruno).queryByText('Ajustar')).not.toBeInTheDocument()
     }
   })
@@ -210,14 +210,14 @@ describe('TabelaRecibos', () => {
 
   it('recibo GERADO mostra "Marcar pago" quando caixa aberto', () => {
     const handler = vi.fn()
-    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} marcandoPago={false} caixaFechado={false} />)
+    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} pagandoId={null} caixaDe={() => 'ABERTO'} />)
 
     expect(screen.getByRole('button', { name: 'Marcar pago' })).toBeInTheDocument()
   })
 
   it('recibo GERADO com caixa fechado mostra "Caixa fechado" (Constituicao 5.3)', () => {
     const handler = vi.fn()
-    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} marcandoPago={false} caixaFechado={true} />)
+    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} pagandoId={null} caixaDe={() => 'FECHADO'} />)
 
     expect(screen.queryByRole('button', { name: 'Marcar pago' })).not.toBeInTheDocument()
     expect(screen.getByText('Caixa fechado')).toBeInTheDocument()
@@ -225,7 +225,7 @@ describe('TabelaRecibos', () => {
 
   it('recibo PAGO nao mostra acoes', () => {
     const handler = vi.fn()
-    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} marcandoPago={false} caixaFechado={false} />)
+    render(<TabelaRecibos recibos={recibos} aoMarcarPago={handler} pagandoId={null} caixaDe={() => 'ABERTO'} />)
 
     // Recibo PAGO nao tem botao
     const linhaPago = screen.getByText('Pago', { selector: 'span' }).closest('tr')
@@ -236,7 +236,7 @@ describe('TabelaRecibos', () => {
   })
 
   it('lista vazia mostra "Nenhum recibo encontrado"', () => {
-    render(<TabelaRecibos recibos={[]} aoMarcarPago={vi.fn()} marcandoPago={false} caixaFechado={false} />)
+    render(<TabelaRecibos recibos={[]} aoMarcarPago={vi.fn()} pagandoId={null} caixaDe={() => 'ABERTO'} />)
     expect(screen.getByText(/[Nn]enhum recibo encontrado/)).toBeInTheDocument()
   })
 })
@@ -254,7 +254,7 @@ describe('AcertoPagina — estado inicial', () => {
       </QueryClientProvider>,
     )
 
-    expect(screen.getByText(/entregador e periodo/i)).toBeInTheDocument()
+    expect(screen.getByText(/entregador e período/i)).toBeInTheDocument()
   })
 })
 
@@ -288,7 +288,7 @@ describe('FiltroAcerto (unitario)', () => {
     })
 
     // Preencher datas
-    fireEvent.change(screen.getByLabelText('Data inicio'), {
+    fireEvent.change(screen.getByLabelText('Data início'), {
       target: { value: '2026-11-09' },
     })
     fireEvent.change(screen.getByLabelText('Data fim'), {
@@ -316,7 +316,7 @@ describe('AcertoPagina — com filtro e dados (pre-populated)', () => {
     // A chave e ['acerto', estId, 'extrato', motoboyId, inicio, fim].
     // Os valores de inicio/fim sao computados em AcertoPagina: `${filtroAtivo.inicio}T00:00:00`.
     const inicio = '2026-11-09T00:00:00'
-    const fim = '2026-11-09T23:59:59'
+    const fim = '2026-11-09T23:59:59.999999'
     qc.setQueryData(
       chavesAcerto.extrato(ESTABELECIMENTO_TESTE, IDS_ACERTO.motoboy, inicio, fim),
       sementeExtrato(),
@@ -338,7 +338,7 @@ describe('AcertoPagina — com filtro e dados (pre-populated)', () => {
     fireEvent.change(screen.getByLabelText('Selecionar entregador'), {
       target: { value: IDS_ACERTO.motoboy },
     })
-    fireEvent.change(screen.getByLabelText('Data inicio'), {
+    fireEvent.change(screen.getByLabelText('Data início'), {
       target: { value: '2026-11-09' },
     })
     fireEvent.change(screen.getByLabelText('Data fim'), {

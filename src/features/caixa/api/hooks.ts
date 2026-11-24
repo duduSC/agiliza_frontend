@@ -14,7 +14,6 @@ import {
   listarCaixas,
   type AbrirCaixaRequest,
 } from './caixaApi'
-import { chavesAcerto, chavesRecibos } from '@/features/acerto/api/hooks'
 
 function useEstabelecimentoDaSessao(): string | null {
   return useSessaoStore((s) => s.estabelecimentoId)
@@ -45,14 +44,33 @@ export function useHistoricoCaixas(dataInicio?: string, dataFim?: string) {
   })
 }
 
+/**
+ * Caixas que cobrem os dias dados (menor ao maior). O acerto decide ajuste, recibo e pagamento
+ * pelo caixa do dia de cada um, e nao pelo de hoje.
+ */
+export function useCaixasDosDias(dias: readonly string[], habilitada: boolean) {
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  const ordenados = [...dias].sort()
+  const de = ordenados[0]
+  const ate = ordenados[ordenados.length - 1]
+  return useQuery({
+    queryKey: chavesCaixa.historico(estabelecimentoId, de, ate),
+    queryFn: ({ signal }) => listarCaixas(de, ate, signal),
+    enabled: estabelecimentoId !== null && habilitada && de !== undefined,
+  })
+}
+
 function useInvalidarCaixa() {
   const queryClient = useQueryClient()
   const estabelecimentoId = useEstabelecimentoDaSessao()
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: chavesCaixa.todas(estabelecimentoId) })
-    // Mudanca de caixa afeta acerto e recibos (ex.: fechar caixa bloqueia acoes)
-    void queryClient.invalidateQueries({ queryKey: chavesAcerto.todas(estabelecimentoId) })
-    void queryClient.invalidateQueries({ queryKey: chavesRecibos.todas(estabelecimentoId) })
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: chavesCaixa.todas(estabelecimentoId) }),
+      // Mudanca de caixa afeta acerto e recibos. So os prefixos, para nao importar o modulo acerto
+      // (que importa este) e criar ciclo.
+      queryClient.invalidateQueries({ queryKey: ['acerto', estabelecimentoId] }),
+      queryClient.invalidateQueries({ queryKey: ['recibos', estabelecimentoId] }),
+    ])
   }
 }
 
@@ -60,7 +78,7 @@ export function useAbrirCaixa() {
   const invalidar = useInvalidarCaixa()
   return useMutation({
     mutationFn: (corpo: AbrirCaixaRequest) => abrirCaixa(corpo),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }
 
@@ -68,6 +86,6 @@ export function useFecharCaixa() {
   const invalidar = useInvalidarCaixa()
   return useMutation({
     mutationFn: (id: string) => fecharCaixa(id),
-    onSuccess: () => invalidar(),
+    onSettled: () => invalidar(),
   })
 }

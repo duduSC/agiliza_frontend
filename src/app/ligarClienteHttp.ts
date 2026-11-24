@@ -10,10 +10,11 @@ import {
   CAMINHO_LOGIN,
   obterRefreshTokenDaSessao,
   obterTokenDaSessao,
+  renovarToken,
   useSessaoStore,
 } from '@/features/auth'
-import { renovarToken } from '@/features/auth/api/authApi'
 import { configurarCliente } from '@/shared/api/client'
+import { ehErroApi } from '@/shared/api/erros'
 
 /** Mutex: so uma tentativa de refresh por vez. */
 let refreshEmAndamento: Promise<string | null> | null = null
@@ -28,10 +29,13 @@ async function tentarRefresh(): Promise<string | null> {
   refreshEmAndamento = (async () => {
     try {
       const resposta = await renovarToken(rt)
+      // Saiu ou trocou de usuário durante a renovação: não ressuscita a sessão antiga.
+      if (obterRefreshTokenDaSessao() !== rt) return null
       useSessaoStore.getState().atualizarTokens(resposta.token, resposta.refreshToken)
       return resposta.token
-    } catch {
-      // Refresh falhou — encerrar sessao
+    } catch (erro) {
+      // Só recusa do servidor encerra a sessão. Rede fora ou 5xx é falha passageira.
+      if (ehErroApi(erro) && (erro.tipo === 'rede' || erro.status >= 500)) throw erro
       return null
     } finally {
       refreshEmAndamento = null
@@ -44,6 +48,7 @@ async function tentarRefresh(): Promise<string | null> {
 export function ligarClienteHttp(navegar: (caminho: string) => void): void {
   configurarCliente({
     obterToken: obterTokenDaSessao,
+    obterSessao: () => useSessaoStore.getState().usuario?.usuarioId ?? null,
     tentarRefresh,
     aoNaoAutenticado: () => {
       useSessaoStore.getState().encerrarSessao()

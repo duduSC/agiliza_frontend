@@ -1,23 +1,32 @@
 /**
  * Lotes DESPACHADO ainda nao saidos (T004, UC01 A4). Oferecem "Devolver lote" apenas
  * quando o status e DESPACHADO. Sem atualizacao otimista (Constituicao 5.8).
+ * T010: cada lote mostra o entregador (nome pela frota; "—" se ela nao chegou).
  */
 import { toast } from 'sonner'
-import type { LoteEntregaResponse } from '@/shared/api/schemas'
+import type { LoteEntregaResponse, MotoboyResponse } from '@/shared/api/schemas'
 import { LABEL_STATUS_LOTE } from '@/shared/dominio'
 import { formatarMoeda } from '@/shared/formatacao'
+import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { ConteudoPorEstado, type EstadoTela } from '@/shared/ui/estados'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useDevolverLote, useLotesDespachados } from '../api/hooks'
+import { nomeDoEntregador } from '../operacao'
 import { mensagemDoErro } from '../util'
 
-export function ListaLotesDespachados() {
+type Props = {
+  /** Frota (ONLINE/EM_ROTA), só para o nome de quem tem cada lote. */
+  entregadores?: readonly MotoboyResponse[]
+}
+
+export function ListaLotesDespachados({ entregadores }: Props = {}) {
   const consulta = useLotesDespachados()
 
   let estado: EstadoTela
   if (consulta.isPending) estado = { tipo: 'carregando' }
-  else if (consulta.isError)
+  else if (consulta.data === undefined)
     estado = {
       tipo: 'erro',
       mensagem: mensagemDoErro(consulta.error),
@@ -27,7 +36,7 @@ export function ListaLotesDespachados() {
     estado = {
       tipo: 'vazio',
       titulo: 'Nenhum lote despachado',
-      descricao: 'Lotes despachados aparecem aqui enquanto nao sairam para rota.',
+      descricao: 'Lotes despachados aparecem aqui enquanto não saem para entrega.',
     }
   else
     estado = {
@@ -35,7 +44,7 @@ export function ListaLotesDespachados() {
       conteudo: (
         <ul aria-label="Lotes despachados" className="flex flex-col gap-3">
           {consulta.data.map((lote) => (
-            <ItemLote key={lote.id} lote={lote} />
+            <ItemLote key={lote.id} lote={lote} entregador={nomeDoEntregador(lote.motoboyId, entregadores)} />
           ))}
         </ul>
       ),
@@ -51,24 +60,26 @@ export function ListaLotesDespachados() {
           </span>
         )}
       </h2>
+      <AvisoDesatualizado consulta={consulta} />
       <ConteudoPorEstado estado={estado} />
     </section>
   )
 }
 
-function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
+function ItemLote({ lote, entregador }: { lote: LoteEntregaResponse; entregador: string | null }) {
   const devolver = useDevolverLote()
   const podeDevolver = lote.status === 'DESPACHADO'
 
-  const aoDevolver = async () => {
-    if (devolver.isPending) return
-    try {
-      await devolver.mutateAsync(lote.id)
-      toast.success(`Lote com ${lote.qtdEntregas} entrega(s) devolvido.`)
-    } catch (erro) {
-      toast.error(mensagemDoErro(erro))
-    }
-  }
+  const envioUnico = useEnvioUnico()
+  const aoDevolver = () =>
+    void envioUnico(async () => {
+      try {
+        await devolver.mutateAsync(lote.id)
+        toast.success(`Lote com ${lote.qtdEntregas} entrega(s) devolvido.`)
+      } catch (erro) {
+        toast.error(mensagemDoErro(erro))
+      }
+    })
 
   return (
     <li
@@ -79,6 +90,9 @@ function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
         <div>
           <p className="font-medium">
             {lote.qtdEntregas} entrega(s)
+          </p>
+          <p className="text-sm">
+            Entregador: <strong>{entregador ?? '—'}</strong>
           </p>
           <p className="text-sm text-muted-foreground">
             Repasse total: {formatarMoeda(lote.valorTotalRepasse)}
@@ -98,7 +112,7 @@ function ItemLote({ lote }: { lote: LoteEntregaResponse }) {
             disabled={devolver.isPending}
             aria-label={`Devolver lote com ${lote.qtdEntregas} entregas`}
           >
-            {devolver.isPending ? 'Devolvendo...' : 'Devolver lote'}
+            {devolver.isPending ? 'Devolvendo…' : 'Devolver lote'}
           </Button>
         </div>
       )}

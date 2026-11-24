@@ -3,3 +3,8 @@ export { EntregadoresPagina } from './paginas/EntregadoresPagina'
 export { FaixasPrecoPagina } from './paginas/FaixasPrecoPagina'
 export { ParametrosLojaPagina } from './paginas/ParametrosLojaPagina'
 export { IntegracaoPagina } from './paginas/IntegracaoPagina'
+export {
+  useEstabelecimentoAtual,
+  chavesEstabelecimento,
+  buscarEstabelecimentoAtual,
+} from './api/estabelecimentoApi'

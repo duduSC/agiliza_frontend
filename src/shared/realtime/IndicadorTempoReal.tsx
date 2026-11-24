@@ -3,7 +3,7 @@
  * Acessibilidade: texto, nao so cor (Constituicao 7.6).
  */
 import { Wifi, WifiOff } from 'lucide-react'
-import { useConexaoTempoReal } from '@/shared/realtime'
+import { useConexaoTempoReal } from '.'
 
 export function IndicadorTempoReal() {
   const estado = useConexaoTempoReal()
@@ -21,7 +21,7 @@ export function IndicadorTempoReal() {
     return (
       <div className="flex items-center gap-1.5 text-xs text-amber-700" role="status">
         <Wifi className="size-3.5 animate-pulse" aria-hidden="true" />
-        <span>Conectando...</span>
+        <span>Conectando…</span>
       </div>
     )
   }
@@ -29,7 +29,7 @@ export function IndicadorTempoReal() {
   return (
     <div className="flex items-center gap-1.5 text-xs text-red-700" role="status" aria-live="polite">
       <WifiOff className="size-3.5" aria-hidden="true" />
-      <span>Tempo real offline (polling a cada 15s)</span>
+      <span>Tempo real offline · atualizando a cada 15 s</span>
     </div>
   )
 }

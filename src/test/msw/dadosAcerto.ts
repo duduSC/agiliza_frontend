@@ -1,9 +1,21 @@
 /**
- * "Banco" em memoria para acerto, recibos e caixa (T006).
- * Os valores monetarios sao dados de exemplo — o frontend nunca os calcula.
+ * "Banco" em memória do acerto, recibos e caixa. Imita o `ExtratoAcertoServiceImpl`: o extrato e
+ * os totais são derivados das entregas finalizadas, como o SERVIDOR faz. O frontend nunca soma.
  */
-import type { ExtratoAcertoResponse, ReciboResponse, CaixaResponse, EntregaAjusteValorResponse } from '@/shared/api/schemas'
-import { IDS, criarCaixaResponse } from '@/test/fabricas'
+import type {
+  CaixaResponse,
+  EntregaAjusteValorResponse,
+  ExtratoAcertoResponse,
+  LinhaExtratoResponse,
+  ReciboResponse,
+} from '@/shared/api/schemas'
+import {
+  IDS,
+  criarAjusteResponse,
+  criarCaixaResponse,
+  criarLinhaExtrato,
+  criarReciboResponse,
+} from '@/test/fabricas'
 
 export const IDS_ACERTO = {
   motoboy: IDS.motoboy,
@@ -13,84 +25,99 @@ export const IDS_ACERTO = {
   recibo: 'dd444444-4444-4444-8444-444444444444',
   reciboGerado: 'dd444444-4444-4444-8444-444444444444',
   reciboPago: 'ee555555-5555-4555-8555-555555555555',
+  caixaFechado: 'ff666666-6666-4666-8666-666666666666',
 } as const
 
-export function sementeExtrato(): ExtratoAcertoResponse {
+/** Entrega finalizada, com o dono. `situacao` é sempre derivada. */
+export type FinalizadaMock = Omit<LinhaExtratoResponse, 'situacao'> & {
+  motoboyId: string
+  emRevisao: boolean
+}
+
+function finalizada(
+  motoboyId: string,
+  emRevisao: boolean,
+  dados: Partial<LinhaExtratoResponse>,
+): FinalizadaMock {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- a situação é sempre derivada
+  const { situacao: _derivada, ...linha } = criarLinhaExtrato(dados)
+  return { ...linha, motoboyId, emRevisao }
+}
+
+function sementeFinalizadas(): FinalizadaMock[] {
+  const m = IDS_ACERTO.motoboy
+  return [
+    finalizada(m, false, { entregaId: IDS_ACERTO.entregaSemRecibo, nomeCliente: 'Ana Souza' }),
+    finalizada(m, false, {
+      entregaId: IDS_ACERTO.entregaComRecibo,
+      nomeCliente: 'Bruno Lima',
+      finalizadaEm: '2026-11-09T15:10:00',
+      distanciaKm: 4.5,
+      reciboId: IDS_ACERTO.recibo,
+    }),
+    finalizada(m, true, {
+      entregaId: IDS_ACERTO.entregaEmRevisao,
+      nomeCliente: 'Carla Dias',
+      finalizadaEm: '2026-11-09T16:00:00',
+      distanciaKm: null,
+      faixaDeKm: null,
+      faixaAteKm: null,
+      valorRepasse: null,
+    }),
+  ]
+}
+
+/** Como o backend: soma em centavos dos valores definidos. */
+export function somarNoServidor(valores: readonly (number | null | undefined)[]): number {
+  return valores.reduce<number>((total, v) => total + Math.round((v ?? 0) * 100), 0) / 100
+}
+
+function montarExtrato(
+  finalizadas: readonly FinalizadaMock[],
+  motoboyId: string,
+  inicio: string,
+  fim: string,
+): ExtratoAcertoResponse {
+  const linhas = finalizadas
+    .filter(
+      (e) =>
+        e.motoboyId === motoboyId && !!e.finalizadaEm && e.finalizadaEm >= inicio && e.finalizadaEm <= fim,
+    )
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- o dono não faz parte do DTO
+    .map(({ motoboyId: _dono, emRevisao, ...linha }): LinhaExtratoResponse => ({
+      ...linha,
+      situacao: emRevisao ? 'EM_REVISAO' : linha.reciboId ? 'CONSOLIDADA' : 'A_ACERTAR',
+    }))
+  const total = (situacao: LinhaExtratoResponse['situacao']) =>
+    somarNoServidor(linhas.filter((l) => l.situacao === situacao).map((l) => l.valorRepasse))
   return {
-    motoboyId: IDS_ACERTO.motoboy,
+    motoboyId,
     nomeEntregador: 'Entregador Exemplo',
-    periodoInicio: '2026-11-09T00:00:00',
-    periodoFim: '2026-11-09T23:59:59',
-    linhas: [
-      {
-        entregaId: IDS_ACERTO.entregaSemRecibo,
-        nomeCliente: 'Ana Souza',
-        finalizadaEm: '2026-11-09T14:30:00',
-        status: 'ENTREGUE',
-        distanciaKm: 3.2,
-        faixaDeKm: 0,
-        faixaAteKm: 5,
-        foraDeArea: false,
-        valorRepasse: 9,
-        situacao: 'A_ACERTAR',
-        reciboId: null,
-      },
-      {
-        entregaId: IDS_ACERTO.entregaComRecibo,
-        nomeCliente: 'Bruno Lima',
-        finalizadaEm: '2026-11-09T15:10:00',
-        status: 'ENTREGUE',
-        distanciaKm: 4.5,
-        faixaDeKm: 0,
-        faixaAteKm: 5,
-        foraDeArea: false,
-        valorRepasse: 9,
-        situacao: 'CONSOLIDADA',
-        reciboId: IDS_ACERTO.recibo,
-      },
-      {
-        entregaId: IDS_ACERTO.entregaEmRevisao,
-        nomeCliente: 'Carla Dias',
-        finalizadaEm: '2026-11-09T16:00:00',
-        status: 'ENTREGUE',
-        distanciaKm: null,
-        faixaDeKm: null,
-        faixaAteKm: null,
-        foraDeArea: false,
-        valorRepasse: null,
-        situacao: 'EM_REVISAO',
-        reciboId: null,
-      },
-    ],
-    totalDevido: 18,
-    totalConsolidado: 9,
-    totalEmRevisao: 0,
-    possuiValorIndefinido: true,
+    periodoInicio: inicio,
+    periodoFim: fim,
+    linhas,
+    totalDevido: total('A_ACERTAR'),
+    totalConsolidado: total('CONSOLIDADA'),
+    totalEmRevisao: total('EM_REVISAO'),
+    possuiValorIndefinido: linhas.some((l) => l.situacao === 'A_ACERTAR' && l.valorRepasse == null),
   }
+}
+
+export function sementeExtrato(): ExtratoAcertoResponse {
+  return montarExtrato(
+    sementeFinalizadas(),
+    IDS_ACERTO.motoboy,
+    '2026-11-09T00:00:00',
+    '2026-11-09T23:59:59.999999',
+  )
 }
 
 export function sementeRecibos(): ReciboResponse[] {
   return [
-    {
-      id: IDS_ACERTO.reciboGerado,
-      estabelecimentoId: IDS.estabelecimento,
-      caixaId: IDS.caixa,
-      motoboyId: IDS_ACERTO.motoboy,
-      usuarioGeradorId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-      dataReferencia: '2026-11-09',
-      periodoInicio: '2026-11-09T00:00:00',
-      periodoFim: '2026-11-09T23:59:59',
-      qtdEntregas: 1,
-      valorTotal: 9,
-      status: 'GERADO',
-      criadoEm: '2026-11-09T17:00:00',
-    },
-    {
+    criarReciboResponse({ id: IDS_ACERTO.reciboGerado, qtdEntregas: 1, valorTotal: 9 }),
+    criarReciboResponse({
       id: IDS_ACERTO.reciboPago,
-      estabelecimentoId: IDS.estabelecimento,
-      caixaId: IDS.caixa,
-      motoboyId: IDS_ACERTO.motoboy,
-      usuarioGeradorId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
+      caixaId: IDS_ACERTO.caixaFechado,
       dataReferencia: '2026-11-08',
       periodoInicio: '2026-11-08T00:00:00',
       periodoFim: '2026-11-08T23:59:59',
@@ -98,8 +125,7 @@ export function sementeRecibos(): ReciboResponse[] {
       valorTotal: 27,
       status: 'PAGO',
       pagoEm: '2026-11-08T18:00:00',
-      criadoEm: '2026-11-08T17:00:00',
-    },
+    }),
   ]
 }
 
@@ -111,83 +137,73 @@ export function sementeHistoricoCaixas(): CaixaResponse[] {
   return [
     criarCaixaResponse(),
     criarCaixaResponse({
-      id: 'ff666666-6666-4666-8666-666666666666',
+      id: IDS_ACERTO.caixaFechado,
       dataReferencia: '2026-11-08',
       abertoEm: '2026-11-08T08:00:00',
       fechadoEm: '2026-11-08T22:00:00',
       status: 'FECHADO',
-      qtdRecibos: 5,
-      valorTotal: 150,
-      criadoEm: '2026-11-08T08:00:00',
+      qtdRecibos: 1,
+      valorTotal: 27,
     }),
   ]
 }
 
 export function sementeAjustes(): EntregaAjusteValorResponse[] {
-  return [
-    {
-      id: 1,
-      entregaId: IDS_ACERTO.entregaSemRecibo,
-      usuarioId: 'b1b2c3d4-0003-4b00-8b00-00000000e003',
-      valorAnterior: 7,
-      valorNovo: 9,
-      motivo: 'Correcao de faixa aplicada',
-      ajustadoEm: '2026-11-09T14:45:00',
-    },
-  ]
+  return [criarAjusteResponse({ entregaId: IDS_ACERTO.entregaSemRecibo, motivo: 'Correção de faixa' })]
 }
 
-// --- Dados em memoria que os handlers usam ---
+// --- Dados em memória que os handlers usam ---
 
-let extrato: ExtratoAcertoResponse = sementeExtrato()
-let recibos: ReciboResponse[] = sementeRecibos()
+let finalizadas = sementeFinalizadas()
+let recibos = sementeRecibos()
 let caixaAtual: CaixaResponse | null = sementeCaixaAtual()
-let historicoCaixas: CaixaResponse[] = sementeHistoricoCaixas()
-let ajustes: Record<string, EntregaAjusteValorResponse[]> = {
-  [IDS_ACERTO.entregaSemRecibo]: sementeAjustes(),
-}
+let caixas = sementeHistoricoCaixas()
+let ajustes = sementeAjustes()
 
 export const dbAcerto = {
-  extrato: () => extrato,
-  atualizarExtrato: (novo: ExtratoAcertoResponse) => { extrato = novo },
+  extrato: (motoboyId: string, inicio: string, fim: string) =>
+    montarExtrato(finalizadas, motoboyId, inicio, fim),
+  finalizada: (entregaId: string) => finalizadas.find((e) => e.entregaId === entregaId),
+  atualizarFinalizada: (entregaId: string, mudancas: Partial<FinalizadaMock>) => {
+    finalizadas = finalizadas.map((e) => (e.entregaId === entregaId ? { ...e, ...mudancas } : e))
+  },
   recibos: () => recibos,
-  inserirRecibo: (r: ReciboResponse) => { recibos = [...recibos, r] },
+  inserirRecibo: (r: ReciboResponse) => {
+    recibos = [...recibos, r]
+  },
   atualizarRecibo: (id: string, mudancas: Partial<ReciboResponse>): ReciboResponse | undefined => {
-    let atualizado: ReciboResponse | undefined
-    recibos = recibos.map((r) => {
-      if (r.id !== id) return r
-      atualizado = { ...r, ...mudancas }
-      return atualizado
-    })
-    return atualizado
+    recibos = recibos.map((r) => (r.id === id ? { ...r, ...mudancas } : r))
+    return recibos.find((r) => r.id === id)
   },
   caixaAtual: () => caixaAtual,
-  definirCaixaAtual: (c: CaixaResponse | null) => { caixaAtual = c },
-  historicoCaixas: () => historicoCaixas,
-  inserirCaixa: (c: CaixaResponse) => { historicoCaixas = [...historicoCaixas, c] },
+  /** Redefinir "hoje sem caixa" também tira o caixa do dia da lista. */
+  definirCaixaAtual: (caixa: CaixaResponse | null) => {
+    const anterior = caixaAtual
+    caixas = caixas.filter((c) => c.id !== anterior?.id && c.id !== caixa?.id)
+    if (caixa) caixas = [...caixas, caixa]
+    caixaAtual = caixa
+  },
+  caixas: () => caixas,
+  inserirCaixa: (caixa: CaixaResponse) => {
+    caixas = [...caixas, caixa]
+    caixaAtual ??= caixa
+  },
   atualizarCaixa: (id: string, mudancas: Partial<CaixaResponse>): CaixaResponse | undefined => {
-    let atualizado: CaixaResponse | undefined
-    historicoCaixas = historicoCaixas.map((c) => {
-      if (c.id !== id) return c
-      atualizado = { ...c, ...mudancas }
-      return atualizado
-    })
-    if (atualizado && caixaAtual && caixaAtual.id === id) {
-      caixaAtual = atualizado
-    }
+    caixas = caixas.map((c) => (c.id === id ? { ...c, ...mudancas } : c))
+    const atualizado = caixas.find((c) => c.id === id)
+    if (atualizado && caixaAtual?.id === id) caixaAtual = atualizado
     return atualizado
   },
-  ajustes: (entregaId: string) => ajustes[entregaId] ?? [],
-  inserirAjuste: (a: EntregaAjusteValorResponse) => {
-    const lista = ajustes[a.entregaId] ?? []
-    ajustes[a.entregaId] = [...lista, a]
+  ajustes: (entregaId: string) => ajustes.filter((a) => a.entregaId === entregaId),
+  inserirAjuste: (ajuste: EntregaAjusteValorResponse) => {
+    ajustes = [...ajustes, ajuste]
   },
 }
 
 export function redefinirAcerto(): void {
-  extrato = sementeExtrato()
+  finalizadas = sementeFinalizadas()
   recibos = sementeRecibos()
   caixaAtual = sementeCaixaAtual()
-  historicoCaixas = sementeHistoricoCaixas()
-  ajustes = { [IDS_ACERTO.entregaSemRecibo]: sementeAjustes() }
+  caixas = sementeHistoricoCaixas()
+  ajustes = sementeAjustes()
 }

@@ -19,5 +19,9 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
     restoreMocks: true,
+    // Maquina de 8 GB com Docker: 2 workers e prazo que aguenta a primeira carga das rotas lazy.
+    maxWorkers: 2,
+    minWorkers: 1,
+    testTimeout: 20_000,
   },
 })

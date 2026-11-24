@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/dialog'
+import { useEnvioUnico } from '@/shared/ui/useEnvioUnico'
 import { useCriarEntregaAvulsa } from '../api/hooks'
 import {
   entregaAvulsaFormSchema,
@@ -89,8 +90,9 @@ export function FormularioEntregaAvulsa({ enviando, aoEnviar, aoConcluir, aoCanc
   })
   const bloqueado = enviando || isSubmitting
 
-  const enviar = handleSubmit(async (valores) => {
-    if (enviando) return
+  const envioUnico = useEnvioUnico()
+  const enviar = handleSubmit((valores) =>
+    envioUnico(async () => {
     setErroGeral(null)
     try {
       await aoEnviar(paraCriarEntregaAvulsaRequest(valores))
@@ -107,7 +109,8 @@ export function FormularioEntregaAvulsa({ enviando, aoEnviar, aoConcluir, aoCanc
         setErroGeral(mensagemDoErro(erro))
       }
     }
-  })
+    }),
+  )
 
   return (
     <form onSubmit={enviar} noValidate aria-label="Entrega avulsa" aria-busy={bloqueado} className="grid gap-4">

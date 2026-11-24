@@ -8,65 +8,23 @@
  * - Somente consulta: nenhuma acao altera estado.
  */
 import { useMemo } from 'react'
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
-import L from 'leaflet'
+import { MapContainer, Marker, Popup, Tooltip } from 'react-leaflet'
+import type L from 'leaflet'
 import type { MotoboyResponse } from '@/shared/api/schemas'
 import type { StatusDisponibilidadeMotoboy } from '@/shared/dominio/enums'
 import { LABEL_STATUS_DISPONIBILIDADE_MOTOBOY } from '@/shared/dominio/enums'
 import { formatarHora } from '@/shared/formatacao'
+import { CamadaMapaClaro } from '@/shared/ui/mapa/CamadaMapaClaro'
+import { EnquadrarMapa } from '@/shared/ui/mapa/EnquadrarMapa'
+import type { PontoDoMapa } from '@/shared/ui/mapa/enquadramento'
+import { PINO_AMBAR, PINO_AZUL, PINO_VERDE, PINO_VERMELHO } from '@/shared/ui/mapa/icones'
 import { posicaoDesatualizada } from '../util'
 import 'leaflet/dist/leaflet.css'
 
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
-
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
-
-/** Icone azul para ONLINE (cor de fundo padrao do Leaflet, sem filtro). */
-const ICONE_ONLINE = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-})
-
-/** Icone verde para EM_ROTA. */
-const ICONE_EM_ROTA = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: 'hue-rotate-[120deg] saturate-200',
-})
-
-/** Icone vermelho/alaranjado para posicao desatualizada (> 3 min). */
-const ICONE_ALERTA = new L.Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: 'hue-rotate-[-30deg] saturate-200',
-})
-
 function iconeDoEntregador(status: StatusDisponibilidadeMotoboy, desatualizado: boolean): L.Icon {
-  if (desatualizado) return ICONE_ALERTA
-  if (status === 'EM_ROTA') return ICONE_EM_ROTA
-  return ICONE_ONLINE
+  if (desatualizado) return PINO_AMBAR
+  if (status === 'EM_ROTA') return PINO_VERDE
+  return PINO_AZUL
 }
 
 type CoordenadaLoja = { latitude: number; longitude: number } | null
@@ -80,12 +38,12 @@ type Props = {
 export function MapaFrota({ entregadores, coordenadaLoja, agora }: Props) {
   const centro = useMemo<[number, number]>(() => {
     if (coordenadaLoja) return [coordenadaLoja.latitude, coordenadaLoja.longitude]
-    // Centrar no primeiro entregador com posicao, ou Sao Paulo
+    // Centrar no primeiro entregador com posicao, ou num centro neutro
     const comPosicao = entregadores.find((e) => e.ultimaPosicao)
     if (comPosicao?.ultimaPosicao) {
       return [comPosicao.ultimaPosicao.latitude, comPosicao.ultimaPosicao.longitude]
     }
-    return [-23.55, -46.63]
+    return [-15.78, -47.93]
   }, [coordenadaLoja, entregadores])
 
   const entregadoresComPosicao = useMemo(
@@ -93,10 +51,18 @@ export function MapaFrota({ entregadores, coordenadaLoja, agora }: Props) {
     [entregadores],
   )
 
+  const pontos = useMemo<PontoDoMapa[]>(
+    () => [
+      ...(coordenadaLoja ? [{ id: 'loja', ...coordenadaLoja }] : []),
+      ...entregadoresComPosicao.map((e) => ({ id: e.id, ...e.ultimaPosicao! })),
+    ],
+    [coordenadaLoja, entregadoresComPosicao],
+  )
+
   return (
     <div
-      className="relative h-[500px] w-full rounded-lg border"
-      role="application"
+      className="relative isolate h-[calc(100dvh-15rem)] min-h-[340px] w-full rounded-lg border"
+      role="region"
       aria-label="Mapa da frota em tempo real"
     >
       <MapContainer
@@ -105,10 +71,22 @@ export function MapaFrota({ entregadores, coordenadaLoja, agora }: Props) {
         className="h-full w-full rounded-lg"
         scrollWheelZoom
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <CamadaMapaClaro />
+
+        <EnquadrarMapa pontos={pontos} />
+
+        {coordenadaLoja && (
+          <Marker
+            position={[coordenadaLoja.latitude, coordenadaLoja.longitude]}
+            icon={PINO_VERMELHO}
+            title="Loja"
+            alt="Loja"
+          >
+            <Tooltip permanent direction="top">
+              Loja
+            </Tooltip>
+          </Marker>
+        )}
 
         {entregadoresComPosicao.map((entregador) => (
           <MarcadorEntregador
@@ -133,7 +111,12 @@ function MarcadorEntregador({ entregador, agora }: { entregador: MotoboyResponse
     <Marker
       position={[entregador.ultimaPosicao.latitude, entregador.ultimaPosicao.longitude]}
       icon={icone}
+      title={`${entregador.nome}: ${labelStatus}`}
+      alt={`${entregador.nome}: ${labelStatus}`}
     >
+      <Tooltip permanent direction="top">
+        {entregador.nome.split(' ')[0]} · {desatualizado ? 'Sem sinal' : labelStatus}
+      </Tooltip>
       <Popup>
         <div className="min-w-[180px] text-sm">
           <p className="font-semibold">{entregador.nome}</p>
@@ -148,12 +131,12 @@ function MarcadorEntregador({ entregador, agora }: { entregador: MotoboyResponse
             </p>
           )}
           <p>
-            <span className="text-muted-foreground">Ultima posicao: </span>
+            <span className="text-muted-foreground">Última posição: </span>
             {formatarHora(entregador.ultimaPosicaoEm)}
           </p>
           {desatualizado && (
             <p className="mt-1 font-medium text-amber-700" role="alert">
-              Posicao desatualizada (mais de 3 min)
+              Posição desatualizada (mais de 3 min)
             </p>
           )}
         </div>

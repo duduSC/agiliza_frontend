@@ -151,7 +151,7 @@ describe('caixa do dia', () => {
 
     // Dialogo de confirmacao aparece com aviso
     await waitFor(() => {
-      expect(screen.getByText(/[Ii]mutavel/)).toBeInTheDocument()
+      expect(screen.getByText(/[Ii]mutável/)).toBeInTheDocument()
     }, TIMEOUT)
 
     expect(screen.getByRole('button', { name: 'Confirmar fechamento' })).toBeInTheDocument()
@@ -166,7 +166,7 @@ describe('caixa do dia', () => {
     renderizarCaixa(qc)
 
     await waitFor(() => {
-      expect(screen.getByText(/[Pp]eriodo imutavel/)).toBeInTheDocument()
+      expect(screen.getByText(/[Pp]eríodo imutável/)).toBeInTheDocument()
     }, TIMEOUT)
   })
 })
@@ -188,7 +188,7 @@ describe('historico', () => {
     renderizarCaixa()
 
     await waitFor(() => {
-      expect(screen.getByText('Historico')).toBeInTheDocument()
+      expect(screen.getByText('Histórico')).toBeInTheDocument()
     }, TIMEOUT)
   })
 })

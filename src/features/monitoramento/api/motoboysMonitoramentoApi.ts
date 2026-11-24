@@ -13,23 +13,16 @@ const listaMotoboysSchema = z.array(motoboyResponseSchema)
 
 /**
  * Entregadores visiveis no monitoramento: ONLINE ou EM_ROTA (UC04).
- * Faz duas chamadas (uma por status) e junta os resultados, pois
- * o endpoint aceita um unico `statusDisponibilidade` por vez (S008).
+ * Uma leitura so, filtrada aqui: com uma por status, quem trocasse de status entre as duas
+ * aparecia duas vezes ou sumia. Cadastro bloqueado nao faz parte da frota.
  */
 export async function listarEntregadoresNoMapa(signal?: AbortSignal): Promise<MotoboyResponse[]> {
-  const [online, emRota] = await Promise.all([
-    requisitar({
-      caminho: ENDPOINTS.motoboys.listar,
-      query: { statusDisponibilidade: 'ONLINE' },
-      schema: listaMotoboysSchema,
-      signal,
-    }),
-    requisitar({
-      caminho: ENDPOINTS.motoboys.listar,
-      query: { statusDisponibilidade: 'EM_ROTA' },
-      schema: listaMotoboysSchema,
-      signal,
-    }),
-  ])
-  return [...online, ...emRota]
+  const motoboys = await requisitar({
+    caminho: ENDPOINTS.motoboys.listar,
+    schema: listaMotoboysSchema,
+    signal,
+  })
+  return motoboys.filter(
+    (m) => m.statusCadastro === 'ATIVO' && m.statusDisponibilidade !== 'OFFLINE',
+  )
 }
