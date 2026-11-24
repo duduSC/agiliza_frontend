@@ -11,7 +11,7 @@ import {
 const caminhos = (perfil: Parameters<typeof telasDoPerfil>[0]) =>
   telasDoPerfil(perfil).map((t) => t.caminho)
 
-const OPERACAO = ['/despacho', '/monitoramento', '/acerto', '/caixa']
+const OPERACAO = ['/despacho', '/monitoramento', '/acerto', '/caixa', '/relatorio']
 const LOJA = ['/loja/entregadores', '/loja/faixas-preco', '/loja/parametros', '/loja/integracao']
 
 describe('permissões por perfil (AGENT.md, seção 7)', () => {

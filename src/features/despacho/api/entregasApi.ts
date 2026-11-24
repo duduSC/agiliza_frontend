@@ -42,6 +42,23 @@ export async function listarEmRevisao(signal?: AbortSignal): Promise<EntregaResp
   return entregas.filter((e) => e.pendenteRevisao)
 }
 
+/**
+ * Entregas que saíram para entrega: DESPACHADA e EM_ROTA (T010, operação unificada). Uma leitura
+ * por status, juntas sem repetir id (quem mudou de status entre as duas aparece uma vez só).
+ */
+export async function listarEmSaida(signal?: AbortSignal): Promise<EntregaResponse[]> {
+  const [despachadas, emRota] = await Promise.all(
+    (['DESPACHADA', 'EM_ROTA'] as const).map((status) =>
+      requisitar({ caminho: ENDPOINTS.entregas.listar, query: { status }, schema: listaEntregasResponseSchema, signal }),
+    ),
+  )
+  const porId = new Map<string, EntregaResponse>()
+  for (const e of [...(despachadas ?? []), ...(emRota ?? [])]) {
+    if (e.status === 'DESPACHADA' || e.status === 'EM_ROTA') porId.set(e.id, e)
+  }
+  return [...porId.values()]
+}
+
 export function criarEntregaAvulsa(corpo: CriarEntregaAvulsaRequest): Promise<EntregaResponse> {
   return requisitar({
     metodo: 'POST',
@@ -77,6 +94,23 @@ export function ajustarCoordenada(
     metodo: 'PATCH',
     caminho: ENDPOINTS.entregas.ajustarCoordenada(id),
     corpo: coordenada,
+    schema: entregaResponseSchema,
+  })
+}
+
+/**
+ * Resolução da contestação do entregador (UC08 A1, HU14; T010). Sem `valorRepasse` (ou com o
+ * valor atual), só tira a pendência; com valor diferente, o backend aplica o ajuste do UC03 A1.
+ * Corpo de `ResolverRevisaoRequest.java`: `valorRepasse` (opcional, >= 0, 2 casas) e `motivo`
+ * (obrigatório, até 100).
+ */
+export type ResolverRevisaoRequest = { valorRepasse?: number; motivo: string }
+
+export function resolverRevisao(id: string, corpo: ResolverRevisaoRequest): Promise<EntregaResponse> {
+  return requisitar({
+    metodo: 'POST',
+    caminho: ENDPOINTS.entregas.resolverRevisao(id),
+    corpo,
     schema: entregaResponseSchema,
   })
 }

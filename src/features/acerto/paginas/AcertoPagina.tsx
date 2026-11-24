@@ -27,6 +27,7 @@ import { FiltroAcerto, type FiltroAcertoValues } from '../componentes/FiltroAcer
 import { TabelaExtrato } from '../componentes/TabelaExtrato'
 import { TabelaRecibos } from '../componentes/TabelaRecibos'
 import { TotaisExtrato } from '../componentes/TotaisExtrato'
+import { useFiltroAcertoStore } from '../filtroStore'
 import { caixaDaEntrega, caixaDoDia, caixaDoRecibo, diaDe, diaFechadoNoRecibo } from '../regras'
 
 const listaMotoboysSchema = z.array(motoboyResponseSchema)
@@ -38,8 +39,9 @@ function mensagem(erro: unknown): string {
 export function AcertoPagina() {
   const estabelecimentoId = useSessaoStore((s) => s.estabelecimentoId)
 
-  // Filtros
-  const [filtroAtivo, setFiltroAtivo] = useState<FiltroAcertoValues | null>(null)
+  // Filtro aplicado: guardado entre abas, so em memoria (T010; `../filtroStore`).
+  const filtroAtivo = useFiltroAcertoStore((s) => s.filtro)
+  const setFiltroAtivo = useFiltroAcertoStore((s) => s.aplicar)
 
   // Dialogos: guardam so o id; valor e recibo saem sempre do extrato atual.
   const [entregaAjusteId, setEntregaAjusteId] = useState<string | null>(null)
@@ -139,6 +141,7 @@ export function AcertoPagina() {
         motoboys={motoboysQuery.data ?? []}
         aoFiltrar={filtrar}
         carregando={extratoQuery.isFetching}
+        inicial={filtroAtivo}
       />
 
       {/* Extrato */}

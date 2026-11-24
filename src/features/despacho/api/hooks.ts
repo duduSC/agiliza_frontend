@@ -16,11 +16,14 @@ import {
   cancelarEntrega,
   criarEntregaAvulsa,
   listarEmRevisao,
+  listarEmSaida,
   listarPendentesDeDespacho,
   marcarPronto,
+  resolverRevisao,
+  type ResolverRevisaoRequest,
 } from './entregasApi'
 import { contarFalhasPendentes } from './falhasApi'
-import { despacharLote, devolverLote, listarLotesDespachados, type DespacharLoteRequest } from './lotesApi'
+import { despacharLote, devolverLote, listarLotesDespachados, listarLotesEmRota, type DespacharLoteRequest } from './lotesApi'
 import { listarEntregadoresDisponiveis } from './motoboysApi'
 
 export const chavesEntregas = {
@@ -28,12 +31,14 @@ export const chavesEntregas = {
   pendentes: (estabelecimentoId: string | null) =>
     ['entregas', estabelecimentoId, 'pendentes'] as const,
   revisao: (estabelecimentoId: string | null) => ['entregas', estabelecimentoId, 'revisao'] as const,
+  emSaida: (estabelecimentoId: string | null) => ['entregas', estabelecimentoId, 'emSaida'] as const,
 }
 
 export const chavesLotes = {
   todas: (estabelecimentoId: string | null) => ['lotes', estabelecimentoId] as const,
   despachados: (estabelecimentoId: string | null) =>
     ['lotes', estabelecimentoId, 'despachados'] as const,
+  emRota: (estabelecimentoId: string | null) => ['lotes', estabelecimentoId, 'emRota'] as const,
 }
 
 export const chavesMotoboys = {
@@ -80,6 +85,30 @@ export function useLotesDespachados() {
     queryKey: chavesLotes.despachados(estabelecimentoId),
     queryFn: ({ signal }) => listarLotesDespachados(signal),
     enabled: estabelecimentoId !== null,
+    refetchInterval,
+  })
+}
+
+/** Entregas DESPACHADA e EM_ROTA, só quando o filtro da operação as mostra (T010). */
+export function useEntregasEmSaida(habilitado: boolean) {
+  const refetchInterval = usePollingDeReserva()
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useQuery({
+    queryKey: chavesEntregas.emSaida(estabelecimentoId),
+    queryFn: ({ signal }) => listarEmSaida(signal),
+    enabled: habilitado && estabelecimentoId !== null,
+    refetchInterval,
+  })
+}
+
+/** Lotes EM_ROTA: junto com os DESPACHADO, dão o entregador de cada entrega em saída (T010). */
+export function useLotesEmRota(habilitado: boolean) {
+  const refetchInterval = usePollingDeReserva()
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useQuery({
+    queryKey: chavesLotes.emRota(estabelecimentoId),
+    queryFn: ({ signal }) => listarLotesEmRota(signal),
+    enabled: habilitado && estabelecimentoId !== null,
     refetchInterval,
   })
 }
@@ -165,5 +194,26 @@ export function useDevolverLote() {
   return useMutation({
     mutationFn: (id: string) => devolverLote(id),
     onSettled: () => invalidar(),
+  })
+}
+
+/**
+ * Analisar contestação (T010). Ao resolver, a entrega volta a contar no acerto: invalida também
+ * acerto, recibos e caixa pelo prefixo (sem importar os módulos, para não criar ciclo).
+ * Move dinheiro quando ajusta: sem otimismo (Constituição, Artigo 5.8).
+ */
+export function useResolverRevisao() {
+  const invalidar = useInvalidarDespacho()
+  const queryClient = useQueryClient()
+  const estabelecimentoId = useEstabelecimentoDaSessao()
+  return useMutation({
+    mutationFn: ({ id, corpo }: { id: string; corpo: ResolverRevisaoRequest }) => resolverRevisao(id, corpo),
+    onSettled: () =>
+      Promise.all([
+        invalidar(),
+        queryClient.invalidateQueries({ queryKey: ['acerto', estabelecimentoId] }),
+        queryClient.invalidateQueries({ queryKey: ['recibos', estabelecimentoId] }),
+        queryClient.invalidateQueries({ queryKey: ['caixa', estabelecimentoId] }),
+      ]),
   })
 }

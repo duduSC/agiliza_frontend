@@ -44,7 +44,7 @@ beforeEach(() => redefinirSessao())
 
 describe('pagina inicial - atalhos por perfil', () => {
   it.each<[PerfilUsuario, string[]]>([
-    ['OPERADOR', ['Despacho', 'Monitoramento', 'Acerto', 'Caixa']],
+    ['OPERADOR', ['Despacho', 'Monitoramento', 'Acerto', 'Caixa', 'Relatório do dia']],
     [
       'ADMIN_RESTAURANTE',
       [
@@ -56,6 +56,7 @@ describe('pagina inicial - atalhos por perfil', () => {
         'Monitoramento',
         'Acerto',
         'Caixa',
+        'Relatório do dia',
       ],
     ],
     ['ADMIN_GERAL', ['Restaurantes']],

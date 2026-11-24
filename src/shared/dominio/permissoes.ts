@@ -17,6 +17,7 @@ export type ChaveTela =
   | 'monitoramento'
   | 'acerto'
   | 'caixa'
+  | 'relatorio'
 
 export type Tela = {
   chave: ChaveTela
@@ -49,6 +50,8 @@ export const TELAS: readonly Tela[] = [
   { chave: 'monitoramento', caminho: '/monitoramento', titulo: 'Monitoramento', descricao: 'Posição e disponibilidade dos entregadores em tempo real.', perfis: OPERACAO },
   { chave: 'acerto', caminho: '/acerto', titulo: 'Acerto', descricao: 'Extrato por entregador, ajustes e recibos.', perfis: OPERACAO },
   { chave: 'caixa', caminho: '/caixa', titulo: 'Caixa', descricao: 'Abertura, fechamento e reabertura do caixa do dia.', perfis: OPERACAO },
+  // T010 (D013, decisão 5): resumo simples do dia, decisão de escopo do Eduardo.
+  { chave: 'relatorio', caminho: '/relatorio', titulo: 'Relatório do dia', descricao: 'Entregas do dia, entregadores que trabalharam e repasse pago e a pagar.', perfis: OPERACAO },
 ]
 
 export function obterTela(chave: ChaveTela): Tela {

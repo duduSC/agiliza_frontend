@@ -2,19 +2,21 @@
  * Fila de revisão (`pendenteRevisao = true`; HU01, UC01 A1; Constituição, Artigo 5.4).
  * Só três motivos existem. Entrega aqui NÃO aparece entre as pendentes de despacho.
  *
- * - SEM_COORDENADA: o operador informa latitude/longitude (o arrastar do pino é da F3);
- *   a distância é recalculada pelo backend e a tela só muda após a resposta.
- * - SEM_DISTANCIA: nenhuma ação nesta tarefa (padrão restritivo).
- * - CONTESTACAO_ENTREGADOR: a análise é do acerto (F5); aqui só é sinalizada.
+ * - SEM_COORDENADA: o operador informa latitude/longitude (não há pino para arrastar);
+ * - SEM_DISTANCIA: "Reposicionar pino" abre o mesmo formulário já com a coordenada atual, e o
+ *   pino âmbar no mapa pode ser arrastado (T010). Nos dois, o backend recalcula a distância e
+ *   tira da revisão; se a rota falhar de novo, a entrega continua aqui e o operador é avisado.
+ * - CONTESTACAO_ENTREGADOR: "Analisar contestação" (T010; `DialogoAnalisarContestacao`).
+ * A tela só muda após a resposta do servidor.
  */
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
 import { ehErroApi, type EntregaResponse } from '@/shared/api'
 import { LABEL_MOTIVO_REVISAO, LABEL_STATUS_ENTREGA } from '@/shared/dominio'
 import { formatarKm, formatarMoeda } from '@/shared/formatacao'
+import { avisarResultadoDoPino } from '../avisos'
 import { AvisoDesatualizado } from '@/shared/ui/AvisoDesatualizado'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
@@ -26,9 +28,10 @@ import {
   paraAjustarCoordenadaRequest,
   type CoordenadaForm,
 } from '../formularios'
-import { podeAjustarCoordenada, podeCancelar } from '../regras'
+import { podeAjustarCoordenada, podeAnalisarContestacao, podeCancelar } from '../regras'
 import { mensagemDoErro } from '../util'
 import { CampoTexto } from './campos'
+import { BotaoAnalisarContestacao } from './DialogoAnalisarContestacao'
 import { BotaoCancelarEntrega } from './DialogoCancelarEntrega'
 
 export function ListaRevisao() {
@@ -112,14 +115,31 @@ function ItemRevisao({ entrega }: { entrega: EntregaResponse }) {
           O entregador contestou o valor. A entrega fica fora do recibo até a revisão ser resolvida.
         </p>
       )}
-      {podeAjustarCoordenada(entrega) && <FormularioCoordenada entrega={entrega} />}
-      {podeCancelar(entrega) && (
-        <div className="flex justify-end">
-          <BotaoCancelarEntrega entrega={entrega} />
+      {podeAjustarCoordenada(entrega) && <ReposicionarPino entrega={entrega} />}
+      {(podeAnalisarContestacao(entrega) || podeCancelar(entrega)) && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {podeAnalisarContestacao(entrega) && <BotaoAnalisarContestacao entrega={entrega} />}
+          {podeCancelar(entrega) && <BotaoCancelarEntrega entrega={entrega} />}
         </div>
       )}
     </li>
   )
+}
+
+/** SEM_COORDENADA: formulário à mostra. SEM_DISTANCIA: atrás do botão, com a coordenada atual. */
+function ReposicionarPino({ entrega }: { entrega: EntregaResponse }) {
+  const [aberto, setAberto] = useState(entrega.coordenada == null)
+  if (!aberto) {
+    return (
+      <div className="flex flex-col gap-1">
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setAberto(true)}>
+          Reposicionar pino
+        </Button>
+        <p className="text-xs text-muted-foreground">Ou arraste o pino âmbar no mapa.</p>
+      </div>
+    )
+  }
+  return <FormularioCoordenada entrega={entrega} />
 }
 
 function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
@@ -133,15 +153,21 @@ function FormularioCoordenada({ entrega }: { entrega: EntregaResponse }) {
     formState: { errors },
   } = useForm<CoordenadaForm>({
     resolver: zodResolver(coordenadaFormSchema),
-    defaultValues: { latitude: '', longitude: '' },
+    defaultValues: {
+      latitude: entrega.coordenada ? String(entrega.coordenada.latitude) : '',
+      longitude: entrega.coordenada ? String(entrega.coordenada.longitude) : '',
+    },
   })
 
   const enviar = handleSubmit(async (valores) => {
     await envioUnico(async () => {
       setErroServidor(null)
       try {
-        await ajustar.mutateAsync({ id: entrega.id, coordenada: paraAjustarCoordenadaRequest(valores) })
-        toast.success(`Coordenada de ${entrega.nomeCliente} enviada. A distância é recalculada pelo sistema.`)
+        const atualizada = await ajustar.mutateAsync({
+          id: entrega.id,
+          coordenada: paraAjustarCoordenadaRequest(valores),
+        })
+        avisarResultadoDoPino(atualizada)
       } catch (erro) {
         if (ehErroApi(erro)) {
           for (const { campo, mensagem } of erro.campos) {

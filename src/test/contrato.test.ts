@@ -10,12 +10,18 @@ import { fazerLogin, renovarToken } from '@/features/auth/api/authApi'
 import { ajustarRepasse, buscarExtrato, listarAjustes } from '@/features/acerto/api/acertoApi'
 import { gerarRecibo, listarRecibos, marcarReciboPago } from '@/features/acerto/api/recibosApi'
 import { buscarCaixaAtual, fecharCaixa, listarCaixas } from '@/features/caixa/api/caixaApi'
-import { listarEmRevisao, listarPendentesDeDespacho } from '@/features/despacho/api/entregasApi'
+import {
+  ajustarCoordenada,
+  listarEmRevisao,
+  listarPendentesDeDespacho,
+  resolverRevisao,
+} from '@/features/despacho/api/entregasApi'
 import { contarFalhasPendentes } from '@/features/despacho/api/falhasApi'
 import { despacharLote, devolverLote, listarLotesDespachados } from '@/features/despacho/api/lotesApi'
 import { listarEntregadoresDisponiveis } from '@/features/despacho/api/motoboysApi'
 import { buscarEstabelecimentoAtual } from '@/features/loja'
 import { listarEntregadoresNoMapa } from '@/features/monitoramento/api/motoboysMonitoramentoApi'
+import { buscarRelatorioDoDia } from '@/features/relatorio/api/relatorioApi'
 import { montarUrl } from '@/shared/api/client'
 import * as S from '@/shared/api/schemas'
 import { IDS_ACERTO } from '@/test/msw/dadosAcerto'
@@ -40,6 +46,7 @@ const LEITURAS: [string, () => Promise<unknown>][] = [
   ['recibos', () => listarRecibos(M)],
   ['caixa atual', () => buscarCaixaAtual()],
   ['caixas do período', () => listarCaixas('2026-11-08', '2026-11-09')],
+  ['relatório do dia (PROVISÓRIO, D013)', () => buscarRelatorioDoDia('2026-11-09')],
 ]
 
 describe('leituras: rede + MSW + Zod', () => {
@@ -66,6 +73,8 @@ const DTOS: [string, string, () => z.ZodObject][] = [
   ],
   ['ReciboResponse', `/api/recibos?motoboyId=${M}`, () => S.reciboResponseSchema],
   ['CaixaResponse', '/api/caixas/atual', () => S.caixaResponseSchema],
+  // PROVISÓRIO (T010): contrato da D013, ainda sem DTO em develop do backend.
+  ['RelatorioDoDiaResponse', '/api/relatorios/dia?data=2026-11-09', () => S.relatorioDoDiaResponseSchema],
 ]
 
 describe('mocks com exatamente os campos do DTO', () => {
@@ -125,6 +134,24 @@ describe('mocks seguem as regras do backend', () => {
     expect(extrato.totalDevido).toBe(0)
     expect(extrato.totalConsolidado).toBe(18)
     expect((await marcarReciboPago(recibo.id)).status).toBe('PAGO')
+  })
+
+  it('resolver revisão de localização: 422, o pino é que resolve (T010)', async () => {
+    await expect(resolverRevisao(IDS_ENTREGAS.revisaoSemDistancia, { motivo: 'x' })).rejects.toMatchObject({
+      status: 422,
+      codigo: 'REGRA_NEGOCIO_VIOLADA',
+    })
+  })
+
+  it('reposicionar o pino não resolve a contestação; resolver sim (T010)', async () => {
+    const id = IDS_ENTREGAS.revisaoContestacao
+    await expect(ajustarCoordenada(id, { latitude: -23.5, longitude: -46.6 })).rejects.toMatchObject({
+      status: 422,
+      codigo: 'REGRA_NEGOCIO_VIOLADA',
+    })
+    const resolvida = await resolverRevisao(id, { valorRepasse: 12, motivo: 'faixa errada' })
+    expect(resolvida).toMatchObject({ pendenteRevisao: false, motivoRevisao: null, valorRepasse: 12 })
+    await expect(resolverRevisao(id, { motivo: 'de novo' })).rejects.toMatchObject({ status: 422 })
   })
 
   it('caixa fechado é imutável: o ajuste responde CAIXA_FECHADO', async () => {

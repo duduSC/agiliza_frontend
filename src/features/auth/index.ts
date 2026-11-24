@@ -4,6 +4,7 @@ export {
   obterTokenDaSessao,
   obterRefreshTokenDaSessao,
   registrarLimpezaDeCache,
+  aoTrocarDeSessao,
   MENSAGEM_PERFIL_SEM_ACESSO,
   MENSAGEM_SEM_ESTABELECIMENTO,
   type DadosInicioSessao,

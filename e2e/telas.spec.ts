@@ -63,8 +63,10 @@ for (const resolucao of RESOLUCOES) {
       })
       expect(status).toBe(201)
 
+      // Operação unificada (T010): loja, 4 pedidos aguardando (o distante incluído), o pino da
+      // revisão SEM_DISTANCIA e os 4 entregadores da frota com posição.
       await abrirPeloMenu(page, 'Despacho')
-      await todosOsPinosVisiveis(page, 'Mapa de entregas', 5)
+      await todosOsPinosVisiveis(page, 'Mapa de entregas e entregadores', 10)
 
       await abrirPeloMenu(page, 'Monitoramento')
       await todosOsPinosVisiveis(page, 'Mapa da frota em tempo real', 5)

@@ -49,6 +49,10 @@ vi.mock('@/features/caixa', async (original) => {
   const m = await original<typeof import('@/features/caixa')>()
   return { ...m, CaixaPagina: falha.comFalha('caixa', m.CaixaPagina) }
 })
+vi.mock('@/features/relatorio', async (original) => {
+  const m = await original<typeof import('@/features/relatorio')>()
+  return { ...m, RelatorioPagina: falha.comFalha('relatorio', m.RelatorioPagina) }
+})
 vi.mock('@/features/restaurantes', async (original) => {
   const m = await original<typeof import('@/features/restaurantes')>()
   return { RestaurantesPagina: falha.comFalha('restaurantes', m.RestaurantesPagina) }
@@ -85,6 +89,7 @@ describe('erro de renderização fica contido em cada página', () => {
     ['monitoramento', '/monitoramento', 'OPERADOR'],
     ['acerto', '/acerto', 'OPERADOR'],
     ['caixa', '/caixa', 'OPERADOR'],
+    ['relatorio', '/relatorio', 'OPERADOR'],
     ['entregadores', '/loja/entregadores', 'ADMIN_RESTAURANTE'],
     ['faixas', '/loja/faixas-preco', 'ADMIN_RESTAURANTE'],
     ['parametros', '/loja/parametros', 'ADMIN_RESTAURANTE'],
@@ -112,7 +117,7 @@ describe('erro de renderização fica contido em cada página', () => {
   })
 })
 
-const TELAS_COM_DADOS = ['/inicio', '/despacho', '/monitoramento', '/acerto', '/caixa'] as const
+const TELAS_COM_DADOS = ['/inicio', '/despacho', '/monitoramento', '/acerto', '/caixa', '/relatorio'] as const
 
 describe.each(TELAS_COM_DADOS)('%s com a API falhando', (rota) => {
   it.each([

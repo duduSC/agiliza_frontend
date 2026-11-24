@@ -3,6 +3,10 @@ import React from 'react'
 import { cleanup, configure } from '@testing-library/react'
 import { toast } from 'sonner'
 import { vi } from 'vitest'
+import { useFiltroAcertoStore } from '@/features/acerto/filtroStore'
+import { useFiltroOperacaoStore } from '@/features/despacho/filtroOperacaoStore'
+import { useSelecaoStore } from '@/features/despacho/selecaoStore'
+import { useFiltroRelatorioStore } from '@/features/relatorio/filtroStore'
 import { mapaFalso } from './mapaFalso'
 import { redefinirAcerto } from './msw/dadosAcerto'
 import { redefinirEntregas } from './msw/dadosEntregas'
@@ -15,14 +19,22 @@ import { server } from './msw/server'
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'mapa-leaflet' }, children),
-  TileLayer: () => null,
+  // A camada expõe o que importa conferir: de onde vêm os tiles e a atribuição (T010).
+  TileLayer: (props: { url: string; attribution?: string; className?: string }) =>
+    React.createElement('div', {
+      'data-testid': 'camada-mapa',
+      'data-url': props.url,
+      'data-atribuicao': props.attribution,
+      'data-classe': props.className,
+    }),
   useMap: () => mapaFalso,
+  Pane: () => null,
   Marker: (props: {
     children: React.ReactNode
     position: [number, number]
     icon?: unknown
     title?: string
-    eventHandlers?: { click?: () => void }
+    eventHandlers?: { click?: () => void; dragend?: (evento: unknown) => void }
   }) => {
     // Reproduz o Leaflet real (T008): `icon` presente porem `undefined` sobrescreve o icone
     // padrao e o Leaflet quebra em `options.icon.createIcon()`.
@@ -34,7 +46,20 @@ vi.mock('react-leaflet', () => ({
     }
     return React.createElement(
       'div',
-      { 'data-testid': 'pino-mapa', title: props.title, onClick: props.eventHandlers?.click },
+      {
+        'data-testid': 'pino-mapa',
+        title: props.title,
+        // A posição atual, para provar que o entregador anda no mapa (T010).
+        'data-posicao': props.position.join(','),
+        onClick: props.eventHandlers?.click,
+        // Arrastar: o teste dispara `dragEnd` e o pino "cai" 0,001 grau ao norte e a leste.
+        onDragEnd: props.eventHandlers?.dragend
+          ? () =>
+              props.eventHandlers?.dragend?.({
+                target: { getLatLng: () => ({ lat: props.position[0] + 0.001, lng: props.position[1] + 0.001 }) },
+              })
+          : undefined,
+      },
       props.children,
     )
   },
@@ -50,10 +75,13 @@ vi.mock('leaflet', () => {
       static mergeOptions() {}
     }
   }
+  // divIcon (T010): devolve as opções, o bastante para o `<Marker>` falso não lançar.
+  const divIcon = (opcoes: object) => ({ ...opcoes })
   return {
-    default: { Icon, icon: () => ({}) },
+    default: { Icon, icon: () => ({}), divIcon },
     Icon,
     icon: () => ({}),
+    divIcon,
   }
 })
 
@@ -105,5 +133,10 @@ afterEach(() => {
   redefinirLotes()
   redefinirMotoboys()
   mapaFalso.fitBounds.mockClear()
+  // Estado de tela guardado entre abas (T010): cada teste começa sem o do anterior.
+  useFiltroAcertoStore.getState().limpar()
+  useSelecaoStore.getState().limparSelecao()
+  useFiltroRelatorioStore.getState().limpar()
+  useFiltroOperacaoStore.getState().limpar()
 })
 afterAll(() => server.close())

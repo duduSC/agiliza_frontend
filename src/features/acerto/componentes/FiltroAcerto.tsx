@@ -6,23 +6,22 @@ import type { MotoboyResponse } from '@/shared/api/schemas'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import type { FiltroAcertoValues } from '../filtroStore'
 
-export type FiltroAcertoValues = {
-  motoboyId: string
-  inicio: string
-  fim: string
-}
+export type { FiltroAcertoValues }
 
 type Props = {
   motoboys: MotoboyResponse[]
   aoFiltrar: (filtro: FiltroAcertoValues) => void
   carregando?: boolean
+  /** Filtro já aplicado, para a tela voltar como estava ao trocar de aba (T010). */
+  inicial?: FiltroAcertoValues | null
 }
 
-export function FiltroAcerto({ motoboys, aoFiltrar, carregando }: Props) {
-  const [motoboyId, setMotoboyId] = useState('')
-  const [inicio, setInicio] = useState('')
-  const [fim, setFim] = useState('')
+export function FiltroAcerto({ motoboys, aoFiltrar, carregando, inicial }: Props) {
+  const [motoboyId, setMotoboyId] = useState(inicial?.motoboyId ?? '')
+  const [inicio, setInicio] = useState(inicial?.inicio ?? '')
+  const [fim, setFim] = useState(inicial?.fim ?? '')
   const [erro, setErro] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent) {
